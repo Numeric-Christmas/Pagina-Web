@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="jumbotron">
+  <h1 class="display-4">Saludos, estimado!</h1>
+  <p class="lead">Esta es una página web, creada para mostrarte los trabajos que estoy dispuesto a realizar si necesitas automatizar un negocio, una tarea o un proyecto .</p>
+  <hr class="my-4">
+  <p>Puedo modelar ecuaciones diferencias, crear inteligencia artificial y tambien especular en la bolsa.</p>
+  <p class="lead">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('about') }}" role="button">Comenzar</a>
+  </p>
+</div>
+{% endblock %}
