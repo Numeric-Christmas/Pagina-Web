@@ -1,0 +1,312 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="p-4 p-md-5 bg-light rounded-3 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="display-6 fw-bold text-primary mb-0">Sala: {{ nombre_sala }}</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('home') }}">Volver al Inicio</a>
+    </div>
+    <p class="lead text-muted">Panel de control con persistencia centralizada en base de datos.</p>
+    <hr class="my-4">
+    
+    <div class="row g-4">
+        <!-- 1. SECCIÓN DE REGISTROS -->
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                    📋 Registro de Participantes o Actividades
+                </div>
+                <div class="card-body">
+                    <!-- Caja de texto + Botón de acción -->
+                    <div class="input-group mb-3">
+                        <input type="text" id="inputRegistro" class="form-control" placeholder="Escribe un nuevo registro...">
+                        <button class="btn btn-primary" type="button" onclick="agregarRegistro()">
+                            Añadir nombre o registro
+                        </button>
+                    </div>
+
+                    <!-- Lista de registros renderizada con Jinja desde SQLite -->
+                    <ul id="listaRegistros" class="list-group list-group-flush border rounded-2">
+                        {% if registros|length == 0 %}
+                            <li class="list-group-item text-muted text-center py-3 empty-msg">No hay registros añadidos todavía.</li>
+                        {% else %}
+                            {% for reg in registros %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center registro-item" 
+                                    data-id="{{ reg['id'] }}" 
+                                    onclick="seleccionarRegistro(this)" 
+                                    style="cursor: pointer;" 
+                                    title="Haz clic para seleccionar este registro">
+                                    <div>
+                                        <span class="fw-semibold texto-contenido">{{ reg['texto'] }}</span>
+                                        <span class="contenedor-badges">
+                                            {% if reg['asignacion'] %}
+                                                {{ reg['asignacion']|safe }}
+                                            {% endif %}
+                                        </span>
+                                        <small class="text-muted d-block" style="font-size: 0.75rem;">Hora: {{ reg['hora'] }}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary border-0 fs-5" title="Asignar tarea aleatoria" onclick="event.stopPropagation(); asignarTareaAleatoria(this);">
+                                        🔀
+                                    </button>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. SECCIÓN DE TAREAS -->
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">
+                    ✅ Asignar Tareas o Pendiente
+                </div>
+                <div class="card-body">
+                    <!-- Caja de texto + Botón de acción -->
+                    <div class="input-group mb-3">
+                        <input type="text" id="inputTarea" class="form-control" placeholder="Escribe una nueva tarea...">
+                        <button class="btn btn-success" type="button" onclick="agregarTarea()">
+                            Nueva tarea o pendientes
+                        </button>
+                    </div>
+
+                    <!-- Lista de tareas renderizada con Jinja desde SQLite -->
+                    <ul id="listaTareas" class="list-group list-group-flush border rounded-2">
+                        {% if tareas|length == 0 %}
+                            <li class="list-group-item text-muted text-center py-3 empty-msg">No hay tareas asignadas todavía.</li>
+                        {% else %}
+                            {% for tar in tareas %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center" data-id="{{ tar['id'] }}">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button class="btn btn-sm btn-outline-success border-0 fs-5 p-0" title="Asignar al registro seleccionado" onclick="asignarAlRegistro(this)">
+                                            ➕
+                                        </button>
+                                        <span class="fw-semibold tarea-texto">{{ tar['texto'] }}</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger border-0 fs-5" title="Eliminar tarea" onclick="eliminarTarea(this)">
+                                        &times;
+                                    </button>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const SALA_ACTUAL = "{{ nombre_sala }}";
+let registroSeleccionado = null;
+
+// Marcar automáticamente el último registro si ya existen registros cargados
+document.addEventListener("DOMContentLoaded", () => {
+    const items = document.querySelectorAll('#listaRegistros li.registro-item');
+    if (items.length > 0) {
+        seleccionarRegistro(items[items.length - 1]);
+    }
+});
+
+function limpiarVacio(listaId) {
+    const lista = document.getElementById(listaId);
+    const emptyMsg = lista.querySelector('.empty-msg');
+    if (emptyMsg) emptyMsg.remove();
+}
+
+function verificarVacio(listaId) {
+    const lista = document.getElementById(listaId);
+    if (lista.querySelectorAll('li:not(.empty-msg)').length === 0) {
+        const esRegistro = listaId === 'listaRegistros';
+        lista.innerHTML = `<li class="list-group-item text-muted text-center py-3 empty-msg">No hay ${esRegistro ? 'registros añadidos' : 'tareas asignadas'} todavía.</li>`;
+        if (esRegistro) registroSeleccionado = null;
+    }
+}
+
+function seleccionarRegistro(elementoLi) {
+    document.querySelectorAll('#listaRegistros li.registro-item').forEach(li => {
+        li.classList.remove('border-primary', 'bg-light');
+    });
+    elementoLi.classList.add('border-primary', 'bg-light');
+    registroSeleccionado = elementoLi;
+}
+
+// ------------------------------
+// OPERACIONES DE REGISTRO
+// ------------------------------
+async function agregarRegistro() {
+    const input = document.getElementById('inputRegistro');
+    const texto = input.value.trim();
+    if (texto === "") {
+        input.focus();
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/registros/agregar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sala: SALA_ACTUAL, texto: texto })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            limpiarVacio('listaRegistros');
+            
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center registro-item";
+            li.setAttribute("data-id", data.id);
+            li.style.cursor = "pointer";
+            li.title = "Haz clic para seleccionar este registro";
+            li.onclick = () => seleccionarRegistro(li);
+            
+            li.innerHTML = `
+                <div>
+                    <span class="fw-semibold texto-contenido">${data.texto}</span>
+                    <span class="contenedor-badges"></span>
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">Hora: ${data.hora}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-primary border-0 fs-5" title="Asignar tarea aleatoria" onclick="event.stopPropagation(); asignarTareaAleatoria(this);">
+                    🔀
+                </button>
+            `;
+
+            document.getElementById('listaRegistros').appendChild(li);
+            seleccionarRegistro(li);
+            input.value = "";
+            input.focus();
+        }
+    } catch (err) {
+        console.error("Error al guardar el registro:", err);
+    }
+}
+
+async function guardarAsignacionEnBD(registroId, badgeHtml) {
+    try {
+        await fetch('/api/registros/asignar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ registro_id: registroId, asignacion: badgeHtml })
+        });
+    } catch (err) {
+        console.error("Error al guardar la asignación:", err);
+    }
+}
+
+// Botón 🔀: Selección aleatoria
+function asignarTareaAleatoria(boton) {
+    const tareas = document.querySelectorAll('#listaTareas .tarea-texto');
+    if (tareas.length === 0) {
+        alert("Primero crea al menos una tarea en la lista de la derecha.");
+        return;
+    }
+
+    const indiceAleatorio = Math.floor(Math.random() * tareas.length);
+    const tareaElegida = tareas[indiceAleatorio].innerText.trim();
+
+    const liRegistro = boton.closest('li');
+    const registroId = liRegistro.getAttribute('data-id');
+    const badgeHtml = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1">🎲 ${tareaElegida}</span>`;
+
+    liRegistro.querySelector('.contenedor-badges').innerHTML += ` ${badgeHtml}`;
+    guardarAsignacionEnBD(registroId, badgeHtml);
+}
+
+// ------------------------------
+// OPERACIONES DE TAREAS
+// ------------------------------
+async function agregarTarea() {
+    const input = document.getElementById('inputTarea');
+    const texto = input.value.trim();
+    if (texto === "") {
+        input.focus();
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/tareas/agregar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sala: SALA_ACTUAL, texto: texto })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            limpiarVacio('listaTareas');
+            
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center";
+            li.setAttribute("data-id", data.id);
+            li.innerHTML = `
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-success border-0 fs-5 p-0" title="Asignar al registro seleccionado" onclick="asignarAlRegistro(this)">
+                        ➕
+                    </button>
+                    <span class="fw-semibold tarea-texto">${data.texto}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger border-0 fs-5" title="Eliminar tarea" onclick="eliminarTarea(this)">
+                    &times;
+                </button>
+            `;
+
+            document.getElementById('listaTareas').appendChild(li);
+            input.value = "";
+            input.focus();
+        }
+    } catch (err) {
+        console.error("Error al guardar la tarea:", err);
+    }
+}
+
+async function eliminarTarea(boton) {
+    const li = boton.closest('li');
+    const tareaId = li.getAttribute('data-id');
+
+    try {
+        const res = await fetch('/api/tareas/eliminar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tarea_id: tareaId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            li.remove();
+            verificarVacio('listaTareas');
+        }
+    } catch (err) {
+        console.error("Error al eliminar la tarea:", err);
+    }
+}
+
+// Botón ➕: Asignar al registro seleccionado
+function asignarAlRegistro(boton) {
+    const items = document.querySelectorAll('#listaRegistros li.registro-item');
+    if (items.length === 0) {
+        alert("Primero añade al menos un registro en la lista de la izquierda.");
+        document.getElementById('inputRegistro').focus();
+        return;
+    }
+
+    const destino = (registroSeleccionado && document.getElementById('listaRegistros').contains(registroSeleccionado)) 
+                    ? registroSeleccionado 
+                    : items[items.length - 1];
+
+    const tareaTexto = boton.closest('li').querySelector('.tarea-texto').innerText.trim();
+    const registroId = destino.getAttribute('data-id');
+    const badgeHtml = `<span class="badge bg-success-subtle text-success border border-success-subtle ms-1">✅ ${tareaTexto}</span>`;
+
+    destino.querySelector('.contenedor-badges').innerHTML += ` ${badgeHtml}`;
+    guardarAsignacionEnBD(registroId, badgeHtml);
+}
+
+// Atajos con la tecla Enter
+document.getElementById('inputRegistro').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') agregarRegistro();
+});
+
+document.getElementById('inputTarea').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') agregarTarea();
+});
+</script>
+{% endblock %}

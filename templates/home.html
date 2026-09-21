@@ -1,12 +1,44 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="jumbotron">
-  <h1 class="display-4">Saludos, estimado!</h1>
-  <p class="lead">Esta es una página web, creada para mostrarte los trabajos que estoy dispuesto a realizar si necesitas automatizar un negocio, una tarea o un proyecto .</p>
-  <hr class="my-4">
-  <p>Puedo modelar ecuaciones diferencias, crear inteligencia artificial y tambien especular en la bolsa.</p>
-  <p class="lead">
-    <a class="btn btn-primary btn-lg" href="{{ url_for('about') }}" role="button">Comenzar</a>
-  </p>
+<div class="row g-4 align-items-center mb-5">
+    <!-- Columna 1 -->
+    <div class="col-12 col-lg-6">
+        <div class="p-4 p-md-5 bg-light rounded-3 shadow-sm h-100">
+            <h1 class="display-5 fw-bold">Saludos, estimado!</h1>
+            <p class="lead">Esta es una página web, creada para mostrarte los trabajos que estoy dispuesto a realizar si necesitas automatizar un negocio, una tarea o un proyecto.</p>
+            <hr class="my-4">
+            <p>Puedo modelar ecuaciones diferenciales, crear inteligencia artificial y también especular en la bolsa.</p>
+            <p class="lead mb-0">
+                <a class="btn btn-primary btn-lg w-100" href="{{ url_for('about') }}" role="button">Ver Proyectos</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Columna 2: Panel de entretenimiento -->
+    <div class="col-12 col-lg-6">
+        <div class="p-4 p-md-5 bg-light rounded-3 shadow-sm h-100">
+            <h2 class="display-6 fw-bold">Panel de entretenimiento!</h2>
+            <p class="lead text-muted">Aquí puedes crear tu sala en la que podrás hacer registros y asignar tareas</p>
+            <hr class="my-4">
+            
+            <form method="POST" action="{{ url_for('crear_sala') }}">
+                <div class="mb-3">
+                    <label for="nombre_sala" class="form-label fw-semibold">Escribe el nombre de tu sala</label>
+                    <input type="text" class="form-control form-control-lg" id="nombre_sala" name="nombre_sala" placeholder="Ej. Cristian" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-lg w-100">Comenzar</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Mensaje en la esquina inferior derecha -->
+<div class="position-fixed bottom-0 end-0 p-3 text-end small" style="z-index: 1030; line-height: 1.4;">
+    <div class="text-secondary">Creada por Cristian Rodriguez</div>
+    <div><a href="mailto:cr@gmail.com" class="text-decoration-none text-secondary">crodriguezch@uni.pe</a></div>
+    <div>
+        <a href="https://www.facebook.com/cristian.rodriguezchipana/" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-primary fw-bold fs-5">ⓕ</a> 
+        <span class="text-secondary">Métodos Numéricos</span>
+    </div>
 </div>
 {% endblock %}
