@@ -167,5 +167,25 @@ def api_eliminar_tarea():
     
     return jsonify({'success': True})
 
+@app.route('/api/registros/actualizar-asignacion', methods=['POST'])
+def api_actualizar_asignacion():
+    data = request.get_json() or {}
+    registro_id = data.get('registro_id')
+    nueva_asignacion = data.get('asignacion', '').strip()
+    
+    if not registro_id:
+        return jsonify({'success': False, 'error': 'ID no proporcionado'}), 400
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE registros SET asignacion = ? WHERE id = ?",
+        (nueva_asignacion, registro_id)
+    )
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
     app.run(debug=True)
