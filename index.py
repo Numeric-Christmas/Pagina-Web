@@ -121,5 +121,54 @@ def api_eliminar_tarea():
     supabase.table("tareas").delete().eq("id", tarea_id).execute()
     return jsonify({'success': True})
 
+import urllib.parse
+
+def obtener_fotos_carpeta(carpeta):
+    ruta = carpeta.strip("/")
+    urls = []
+    try:
+        archivos = supabase.storage.from_("fotos").list(ruta)
+        print(f"\n[STORAGE] Listando carpeta: '{ruta}'")
+        print(f"[STORAGE] Archivos encontrados: {archivos}")
+        
+        for arch in archivos:
+            nombre = arch.get("name", "")
+            # Descartar archivos vacíos o de sistema
+            if nombre and not nombre.startswith("."):
+                url = supabase.storage.from_("fotos").get_public_url(f"{ruta}/{nombre}")
+                urls.append(url)
+                
+        print(f"[STORAGE] URLs generadas para '{ruta}': {len(urls)}")
+    except Exception as e:
+        print(f"[STORAGE ERROR] En carpeta '{ruta}': {e}")
+    return urls
+
+
+@app.route('/proyectos')
+def proyectos():
+    # Tu número de WhatsApp (+51 para Perú)
+    numero_whatsapp = "51975177733"
+
+    # Mensajes personalizados pre-armados para cada botón
+    msg_web = urllib.parse.quote("Hola, me interesa conocer más sobre sus Aplicativos web y móviles.")
+    msg_exe = urllib.parse.quote("Hola, quisiera información sobre las Interfaces y Software Ejecutables.")
+    msg_num = urllib.parse.quote("Hola, me gustaría consultar sobre los programas de Métodos Numéricos.")
+
+    # Cargar URLs directamente desde las carpetas del bucket
+    fotos_web = obtener_fotos_carpeta("web_movil")
+    fotos_exe = obtener_fotos_carpeta("ejecutables")
+    fotos_met = obtener_fotos_carpeta("metodos")
+
+    return render_template(
+        'proyectos.html',
+        fotos_web=fotos_web,
+        fotos_exe=fotos_exe,
+        fotos_met=fotos_met,
+        tk_link=f"https://www.tiktok.com/@mtodos.numricos",
+        wa_web=f"https://wa.me/{numero_whatsapp}?text={msg_web}",
+        wa_exe=f"https://wa.me/{numero_whatsapp}?text={msg_exe}",
+        wa_num=f"https://wa.me/{numero_whatsapp}?text={msg_num}"
+    )
+
 if __name__ == '__main__':
     app.run(debug=True)

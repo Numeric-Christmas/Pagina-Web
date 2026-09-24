@@ -1,0 +1,176 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+
+    <!-- ========================================== -->
+    <!-- 1. SECCIÓN: Aplicativos web y móviles -->
+    <!-- ========================================== -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 fw-bold text-dark mb-0">Aplicativos web y móviles</h2>
+            <a href="{{ tk_link }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small fw-semibold">Ver más &rarr;</a>
+        </div>
+
+        <div class="row g-3 justify-content-center">
+            <div class="col-12 col-sm-6 col-md-5">
+                <div class="card h-100 shadow-sm border rounded-4 overflow-hidden position-relative">
+                    <span class="badge bg-success position-absolute top-0 end-0 m-2 z-3" style="font-size: 0.75rem;">
+                        Activo
+                    </span>
+
+                    <!-- Carrusel automático a 3 segundos -->
+                    <div id="carruselWebMovil" class="carousel slide" data-bs-ride="carousel" data-bs-interval="3000">
+                        <div class="carousel-inner bg-light" style="height: 210px;">
+                            {% if fotos_web %}
+                                {% for url in fotos_web %}
+                                    <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
+                                        <img src="{{ url }}" class="d-block w-100 h-100 object-fit-contain p-2" alt="Captura Web y Móvil">
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="carousel-item active h-100 d-flex align-items-center justify-content-center text-muted">
+                                    <small>No hay fotos en /web_movil</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carruselWebMovil" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carruselWebMovil" data-bs-slide="next">
+                            <span class="carousel-control-next-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Siguiente</span>
+                        </button>
+                    </div>
+
+                    <div class="card-body text-center d-flex flex-column justify-content-between p-3">
+                        <div>
+                            <h5 class="fw-bold text-danger mb-1">Android & Web App</h5>
+                            <p class="text-muted small mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                Soluciones digitales interactivas multiplataforma, sistemas multi-sala e integración en la nube.
+                            </p>
+                        </div>
+                        <a href="{{ wa_web }}" target="_blank" rel="noopener noreferrer" class="btn btn-danger w-100 rounded-3 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <span>📲</span> Contactar por WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. SECCIÓN: Interfaces y Ejecutables -->
+    <!-- ========================================== -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 fw-bold text-dark mb-0">Interfaces y Ejecutables</h2>
+            <a href="{{ tk_link }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small fw-semibold">Ver más &rarr;</a>
+        </div>
+
+        <div class="row g-3 justify-content-center">
+            <div class="col-12 col-sm-6 col-md-5">
+                <div class="card h-100 shadow-sm border rounded-4 overflow-hidden position-relative">
+                    <span class="badge bg-success position-absolute top-0 end-0 m-2 z-3" style="font-size: 0.75rem;">
+                        Disponible
+                    </span>
+
+                    <div id="carruselEjecutables" class="carousel slide" data-bs-ride="carousel" data-bs-interval="3000">
+                        <div class="carousel-inner bg-light" style="height: 210px;">
+                            {% if fotos_exe %}
+                                {% for url in fotos_exe %}
+                                    <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
+                                        <img src="{{ url }}" class="d-block w-100 h-100 object-fit-contain p-2" alt="Captura Ejecutable">
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="carousel-item active h-100 d-flex align-items-center justify-content-center text-muted">
+                                    <small>No hay fotos en /ejecutables</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carruselEjecutables" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carruselEjecutables" data-bs-slide="next">
+                            <span class="carousel-control-next-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Siguiente</span>
+                        </button>
+                    </div>
+
+                    <div class="card-body text-center d-flex flex-column justify-content-between p-3">
+                        <div>
+                            <h5 class="fw-bold text-danger mb-1">Software de Escritorio</h5>
+                            <p class="text-muted small mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                Aplicaciones de escritorio (.exe) con interfaz gráfica intuitiva para cálculo, reportes y automatización.
+                            </p>
+                        </div>
+                        <a href="{{ wa_exe }}" target="_blank" rel="noopener noreferrer" class="btn btn-danger w-100 rounded-3 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <span>💻</span> Pedir Información por WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. SECCIÓN: Métodos Numéricos -->
+    <!-- ========================================== -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h4 fw-bold text-dark mb-0">Métodos Numéricos</h2>
+            <a href="{{ tk_link }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-muted small fw-semibold">Ver más &rarr;</a>
+        </div>
+
+        <div class="row g-3 justify-content-center">
+            <div class="col-12 col-sm-6 col-md-5">
+                <div class="card h-100 shadow-sm border rounded-4 overflow-hidden position-relative">
+                    <span class="badge bg-success position-absolute top-0 end-0 m-2 z-3" style="font-size: 0.75rem;">
+                        V1.0
+                    </span>
+
+                    <div id="carruselMetodos" class="carousel slide" data-bs-ride="carousel" data-bs-interval="3000">
+                        <div class="carousel-inner bg-light" style="height: 210px;">
+                            {% if fotos_met %}
+                                {% for url in fotos_met %}
+                                    <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
+                                        <img src="{{ url }}" class="d-block w-100 h-100 object-fit-contain p-2" alt="Captura Método Numérico">
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="carousel-item active h-100 d-flex align-items-center justify-content-center text-muted">
+                                    <small>No hay fotos en /metodos</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carruselMetodos" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carruselMetodos" data-bs-slide="next">
+                            <span class="carousel-control-next-icon bg-secondary rounded-circle p-2" aria-hidden="true" style="background-size: 60%;"></span>
+                            <span class="visually-hidden">Siguiente</span>
+                        </button>
+                    </div>
+
+                    <div class="card-body text-center d-flex flex-column justify-content-between p-3">
+                        <div>
+                            <h5 class="fw-bold text-danger mb-1">Modelación & Algoritmos</h5>
+                            <p class="text-muted small mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                Rutinas computacionales para aproximación de raíces, álgebra matricial, simulación e integración.
+                            </p>
+                        </div>
+                        <a href="{{ wa_num }}" target="_blank" rel="noopener noreferrer" class="btn btn-danger w-100 rounded-3 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
+                            <span>📐</span> Consultar por WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
