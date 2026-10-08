@@ -170,5 +170,13 @@ def proyectos():
         wa_num=f"https://wa.me/{numero_whatsapp}?text={msg_num}"
     )
 
+@app.route('/game')
+def game():
+    return render_template(
+        'game.html',
+        supabase_url=SUPABASE_URL,
+        supabase_key=SUPABASE_KEY
+    )
+
 if __name__ == '__main__':
     app.run(debug=True)

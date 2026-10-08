@@ -1,0 +1,423 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-3 text-center" style="max-width: 540px;">
+    <!-- Elementos de Audio Locales -->
+    <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
+    <audio id="sndVacio" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+
+    <h2 class="fw-bold text-danger mb-1 fs-3">🎯 Ruleta Rusa en Vivo</h2>
+    <p class="text-muted small mb-3">Tambor de 12 recámaras (10 balas y 2 vacías). El jugador que reciba 3 balas pierde.</p>
+
+    <!-- Indicador de Tambor y Balas -->
+    <div class="card p-2 shadow-sm border rounded-4 mb-3 bg-light">
+        <div class="d-flex justify-content-around align-items-center">
+            <div>
+                <span class="text-muted small d-block" style="font-size: 0.8rem;">Tiros restantes:</span>
+                <span id="tirosRestantes" class="fw-bold fs-6 text-dark">12 / 12</span>
+            </div>
+            <div>
+                <span class="text-muted small d-block" style="font-size: 0.8rem;">Recámaras:</span>
+                <span id="balasRestantes" class="fw-bold fs-6 text-danger">10 💥 | 2 💨</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Casillero de ingreso de nombre -->
+    <div class="card p-2 shadow-sm border rounded-4 mb-3">
+        <div class="input-group">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cris admin" maxlength="40">
+            <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
+        </div>
+        <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.8rem;">
+            ¡Registrado con éxito! Sonido habilitado. Esperando el inicio de la partida.
+        </div>
+    </div>
+
+    <!-- Contenedor de la Ruleta con la Pistola 🔫 apuntando -->
+    <div class="position-relative d-inline-flex align-items-center justify-content-center my-2">
+        <div style="position: absolute; left: -38px; font-size: 2rem; transform: scaleX(-1); z-index: 10; user-select: none; line-height: 1;">
+            🔫
+        </div>
+        <canvas id="canvasRuleta" width="290" height="290" class="shadow-sm rounded-circle border border-4 border-dark"></canvas>
+    </div>
+
+    <!-- Panel de controles exclusivo de Admin -->
+    <div id="panelAdmin" class="mt-2 d-none">
+        <div class="alert alert-warning py-1 px-3 d-inline-block small fw-bold mb-2" style="font-size: 0.8rem;">
+            ⭐ Modo Anfitrión Activado
+        </div>
+        <div class="d-flex justify-content-center gap-2">
+            <button id="btnJugar" class="btn btn-danger px-4 fw-bold shadow-sm" onclick="lanzarJuego()">
+                🎰 DISPARAR
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="reiniciarRuleta()">
+                🗑️ Reiniciar Partida
+            </button>
+        </div>
+    </div>
+
+    <!-- Mensaje de espera para participantes normales -->
+    <div id="panelEspera" class="text-muted small fst-italic mt-2">
+        ⏳ Esperando que el anfitrión inicie el juego...
+    </div>
+
+    <!-- Alerta del tiro y Fin de Juego -->
+    <div id="alertaResultado" class="alert alert-danger mt-3 fw-bold fs-6 d-none shadow-sm py-2"></div>
+
+    <!-- Lista de Participantes con sus impactos acumulados -->
+    <div class="mt-3">
+        <h6 class="fw-bold text-muted small">Participantes (<span id="totalConectados">0</span>):</h6>
+        <div id="listaNombres" class="d-flex flex-wrap justify-content-center gap-2 mt-2"></div>
+    </div>
+</div>
+
+<!-- SDK de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://atvybxjsolqmadzojkfm.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0dnlieGpzb2xxbWFkem9qa2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MDg3NTgsImV4cCI6MjEwNDM4NDc1OH0.ks66J_l5S8DQ9FHxpc4e0INNDzCRlUyDb-vnH_l4WvM";
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let participantesBase = [];
+    let participantes = [];
+    let impactos = {};
+
+    let tambor = [];
+    let tiroActual = 0;
+    let juegoTerminado = false;
+
+    const colores = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#00D8B6', '#E74C3C', '#2ECC71', '#F39C12'];
+    const canvas = document.getElementById('canvasRuleta');
+    const ctx = canvas.getContext('2d');
+    let anguloActual = 0;
+    let girando = false;
+
+    // Desbloquear audio en el navegador con interacción del usuario
+    function desbloquearAudio() {
+        const audios = [document.getElementById('sndDisparo'), document.getElementById('sndVacio')];
+        audios.forEach(a => {
+            if (a) {
+                a.play().then(() => {
+                    a.pause();
+                    a.currentTime = 0;
+                }).catch(() => {});
+            }
+        });
+    }
+    // Desbloqueo pasivo al tocar la pantalla si no presionaron "Listo"
+    document.addEventListener('click', desbloquearAudio, { once: true });
+
+    function inicializarTambor() {
+        tambor = [true, true, true, true, true, true, true, true, true, true, false, false];
+        for (let i = tambor.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tambor[i], tambor[j]] = [tambor[j], tambor[i]];
+        }
+        tiroActual = 0;
+        juegoTerminado = false;
+        actualizarMarcadorTambor();
+    }
+
+    function actualizarMarcadorTambor() {
+        const tirosRestantes = 12 - tiroActual;
+        document.getElementById('tirosRestantes').innerText = `${tirosRestantes} / 12`;
+    }
+
+    // 1. Canal Realtime (postgres_changes y broadcast)
+    const canal = client.channel('sala-ruleta');
+
+    canal
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_ruleta' }, () => {
+            cargarParticipantes();
+        })
+        .on('broadcast', { event: 'girar' }, (payload) => {
+            ejecutarAnimacion(payload.payload.totalGiro, payload.payload.esBalaReal);
+        })
+        .on('broadcast', { event: 'reiniciar' }, () => {
+            resetearEstadoLocal();
+        })
+        .subscribe();
+
+    // 2. Cargar participantes de Supabase
+    async function cargarParticipantes() {
+        const { data, error } = await client
+            .from('participantes_ruleta')
+            .select('nombre')
+            .order('id', { ascending: true });
+
+        if (!error && data) {
+            participantesBase = data.map(d => d.nombre);
+            participantes = [...participantesBase];
+
+            if (participantes.length > 0 && participantes.length % 2 !== 0) {
+                participantes.push("Cerebro (Bot)");
+            }
+
+            participantes.forEach(p => {
+                if (impactos[p] === undefined) impactos[p] = 0;
+            });
+
+            actualizarUI();
+        }
+    }
+
+    // 3. Registrar al usuario y verificar rol de Admin
+    async function unirse() {
+        desbloquearAudio();
+
+        const input = document.getElementById('inputNombre');
+        const valorTexto = input.value.trim();
+        if (!valorTexto) return;
+
+        const esAdmin = valorTexto.toLowerCase().includes("admin");
+
+        const palabras = valorTexto.split(/\s+/);
+        let primerNombre = palabras[0];
+        if (primerNombre.toLowerCase() === "admin" && palabras.length > 1) {
+            primerNombre = palabras[1];
+        }
+        primerNombre = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
+
+        const { error } = await client.from('participantes_ruleta').insert([{ nombre: primerNombre }]);
+        if (!error) {
+            input.disabled = true;
+            document.getElementById('btnListo').disabled = true;
+            document.getElementById('msgConfirmacion').classList.remove('d-none');
+
+            if (esAdmin) {
+                document.getElementById('panelAdmin').classList.remove('d-none');
+                document.getElementById('panelEspera').classList.add('d-none');
+            }
+        }
+    }
+
+    // 4. Dibujar la Ruleta (diámetro compacto 290px)
+    function dibujarRuleta() {
+        const num = participantes.length;
+        const centro = canvas.width / 2;
+        const radio = centro - 8;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (num === 0) {
+            ctx.fillStyle = "#f8f9fa";
+            ctx.beginPath();
+            ctx.arc(centro, centro, radio, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = "#6c757d";
+            ctx.font = "bold 13px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Esperando participantes...", centro, centro);
+            return;
+        }
+
+        const arco = (2 * Math.PI) / num;
+
+        for (let i = 0; i < num; i++) {
+            const anguloInicio = anguloActual + i * arco - (arco / 2);
+
+            ctx.beginPath();
+            ctx.fillStyle = colores[i % colores.length];
+            ctx.moveTo(centro, centro);
+            ctx.arc(centro, centro, radio, anguloInicio, anguloInicio + arco);
+            ctx.lineTo(centro, centro);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Texto con los puntos acumulados
+            ctx.save();
+            ctx.translate(centro, centro);
+            ctx.rotate(anguloInicio + arco / 2);
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 12px sans-serif";
+            ctx.shadowColor = "rgba(0,0,0,0.6)";
+            ctx.shadowBlur = 3;
+
+            const nombre = participantes[i];
+            const balas = " •".repeat(impactos[nombre] || 0);
+            ctx.fillText(nombre + balas, radio - 14, 4);
+            ctx.restore();
+        }
+    }
+
+    function actualizarUI() {
+        document.getElementById('totalConectados').innerText = participantes.length;
+        const contenedor = document.getElementById('listaNombres');
+        contenedor.innerHTML = participantes.map(n => {
+            const count = impactos[n] || 0;
+            const marcas = " •".repeat(count);
+            let badgeClass = n.includes("Cerebro") ? 'bg-dark' : 'bg-secondary';
+            if (count === 3) badgeClass = 'bg-danger';
+            return `<span class="badge ${badgeClass} p-2 fs-6">${n}${marcas}</span>`;
+        }).join('');
+        dibujarRuleta();
+    }
+
+    // 5. El anfitrión inicia el disparo
+    function lanzarJuego() {
+        if (girando || juegoTerminado) return;
+        if (participantes.length < 2) {
+            alert("Se necesitan al menos 2 participantes para jugar.");
+            return;
+        }
+
+        if (tiroActual >= 12) {
+            alert("El tambor está vacío. Debes reiniciar la partida.");
+            return;
+        }
+
+        document.getElementById('alertaResultado').classList.add('d-none');
+
+        const n = participantes.length;
+        const arco = (2 * Math.PI) / n;
+
+        const vueltasCompletas = Math.floor(Math.random() * 4 + 6) * n;
+        const pasosExtras = Math.floor(Math.random() * n);
+        const totalGiro = (vueltasCompletas + pasosExtras) * arco;
+
+        const esBalaReal = tambor[tiroActual];
+
+        // Emitir a todos los dispositivos
+        canal.send({
+            type: 'broadcast',
+            event: 'girar',
+            payload: {
+                totalGiro: totalGiro,
+                esBalaReal: esBalaReal
+            }
+        });
+
+        ejecutarAnimacion(totalGiro, esBalaReal);
+    }
+
+    // 6. Animación del giro sincronizada
+    function ejecutarAnimacion(totalGiro, esBalaReal) {
+        if (girando) return;
+        girando = true;
+        const duracion = 5000;
+        const inicio = performance.now();
+        const anguloInicial = anguloActual;
+
+        function animar(ahora) {
+            const tiempo = Math.min((ahora - inicio) / duracion, 1);
+            const progreso = 1 - Math.pow(1 - tiempo, 3);
+            anguloActual = anguloInicial + totalGiro * progreso;
+            dibujarRuleta();
+
+            if (tiempo < 1) {
+                requestAnimationFrame(animar);
+            } else {
+                girando = false;
+                aplicarImpactoFinal(esBalaReal);
+            }
+        }
+        requestAnimationFrame(animar);
+    }
+
+    // 7. Impacto y reproducción de audio cuando la ruleta se detiene
+    function aplicarImpactoFinal(esBalaReal) {
+        const n = participantes.length;
+        const arco = (2 * Math.PI) / n;
+        const delta = ((Math.PI - anguloActual) % (2 * Math.PI) + (2 * Math.PI)) % (2 * Math.PI);
+        const idx = Math.floor((delta + arco / 2) / arco) % n;
+        const afectado = participantes[idx];
+
+        tiroActual++;
+        actualizarMarcadorTambor();
+
+        const sndDisparo = document.getElementById('sndDisparo');
+        const sndVacio = document.getElementById('sndVacio');
+
+        if (esBalaReal) {
+            // Sonido de disparo
+            if (sndDisparo) {
+                sndDisparo.currentTime = 0;
+                sndDisparo.play().catch(e => console.log("Audio disparo bloqueado:", e));
+            }
+            impactos[afectado] = (impactos[afectado] || 0) + 1;
+        } else {
+            // Sonido de recámara vacía
+            if (sndVacio) {
+                sndVacio.currentTime = 0;
+                sndVacio.play().catch(e => console.log("Audio vacío bloqueado:", e));
+            }
+        }
+
+        dibujarRuleta();
+        actualizarUI();
+
+        const cantBalas = impactos[afectado] || 0;
+        const cartel = document.getElementById('alertaResultado');
+        cartel.classList.remove('d-none');
+
+        if (esBalaReal) {
+            cartel.className = "alert alert-danger mt-3 fw-bold fs-6 shadow-sm py-2";
+            cartel.innerHTML = `💥 ¡DISPARO REAL! <span class="text-decoration-underline">${afectado}</span> recibe una bala (${cantBalas}/3).`;
+
+            if (cantBalas >= 3) {
+                juegoTerminado = true;
+                cartel.innerHTML = `☠️ FIN DEL JUEGO: <span class="text-decoration-underline">${afectado}</span> recibió 3 balas y ha sido ELIMINADO.`;
+                bloquearBoton();
+                return;
+            }
+        } else {
+            cartel.className = "alert alert-success mt-3 fw-bold fs-6 shadow-sm py-2";
+            cartel.innerHTML = `💨 *CLICK* ¡Recámara vacía! <span class="text-decoration-underline">${afectado}</span> se ha salvado.`;
+        }
+
+        if (tiroActual >= 12 && !juegoTerminado) {
+            juegoTerminado = true;
+            cartel.className = "alert alert-warning mt-3 fw-bold fs-6 shadow-sm py-2";
+            cartel.innerHTML = `🏁 ¡FIN DEL JUEGO! Se agotaron los 12 tiros del tambor sin ningún eliminado.`;
+            bloquearBoton();
+        }
+    }
+
+    function bloquearBoton() {
+        const btn = document.getElementById('btnJugar');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "⛔ JUEGO TERMINADO";
+        }
+    }
+
+    function resetearEstadoLocal() {
+        inicializarTambor();
+        impactos = {};
+        participantes.forEach(p => impactos[p] = 0);
+        document.getElementById('alertaResultado').classList.add('d-none');
+        const btn = document.getElementById('btnJugar');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "🎰 DISPARAR";
+        }
+        actualizarUI();
+    }
+
+    // 8. Reiniciar partida completa
+    async function reiniciarRuleta() {
+        if (confirm("¿Deseas reiniciar el tambor, las balas y los participantes?")) {
+            await client.from('participantes_ruleta').delete().neq('id', 0);
+
+            canal.send({
+                type: 'broadcast',
+                event: 'reiniciar',
+                payload: {}
+            });
+
+            document.getElementById('inputNombre').disabled = false;
+            document.getElementById('btnListo').disabled = false;
+            document.getElementById('msgConfirmacion').classList.add('d-none');
+            document.getElementById('inputNombre').value = "";
+            anguloActual = 0;
+            resetearEstadoLocal();
+        }
+    }
+
+    inicializarTambor();
+    cargarParticipantes();
+</script>
+{% endblock %}
