@@ -178,5 +178,92 @@ def game():
         supabase_key=SUPABASE_KEY
     )
 
+import json
+import os
+from flask import Flask, jsonify, render_template, request
+from google import genai
+
+# Tu api_key proporcionada
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAJSy3PL5fPekLRDNqSGLkL4seEc44BJG8")
+
+# Inicializamos el cliente de Google GenAI
+client_gemini = None
+try:
+  client_gemini = genai.Client(api_key=GEMINI_API_KEY)
+except Exception as e:
+  print("Aviso al inicializar Gemini Client:", e)
+
+@app.route('/api/bot-decision', methods=['POST'])
+def bot_decision():
+  data = request.get_json() or {}
+  comodines = data.get('comodines', {})
+  jugadores = data.get('jugadores', [])
+  impactos = data.get('impactos', {})
+  idx_cerebro = data.get('idx_cerebro', 0)
+
+  opciones_disponibles = ['disparo']
+  if comodines.get('antihorario'):
+    opciones_disponibles.append('antihorario')
+  if comodines.get('horario'):
+    opciones_disponibles.append('horario')
+  if comodines.get('opuesto'):
+    opciones_disponibles.append('opuesto')
+
+  # Si solo le queda disparo, no es necesario consultar a la IA
+  if len(opciones_disponibles) == 1:
+    return jsonify({
+        'decision': 'disparo',
+        'razon': 'Sin comodines restantes.',
+    })
+
+  n = len(jugadores)
+  if n > 0:
+    vecino_horario = jugadores[(idx_cerebro - 1 + n) % n]
+    vecino_antihorario = jugadores[(idx_cerebro + 1) % n]
+    opuesto = jugadores[(idx_cerebro + n // 2) % n]
+  else:
+    vecino_horario = vecino_antihorario = opuesto = 'nadie'
+
+  prompt = f"""
+    Eres 'Cerebro', un bot jugador de Ruleta Rusa estratégica.
+    La pistola te está apuntando directamente a ti.
+    Tu objetivo número uno es SOBREVIVIR y, si es posible, desviar el tiro hacia el jugador con más balas recibidas.
+    
+    Estado del juego:
+    - Opciones disponibles para ti: {opciones_disponibles}
+    - Jugador a tu lado Horario (si usas horario): {vecino_horario} con {impactos.get(vecino_horario, 0)} balas acumuladas.
+    - Jugador a tu lado Antihorario (si usas antihorario): {vecino_antihorario} con {impactos.get(vecino_antihorario, 0)} balas acumuladas.
+    - Jugador Opuesto a 180° (si usas opuesto): {opuesto} con {impactos.get(opuesto, 0)} balas acumuladas.
+    
+    Regla: Responde ÚNICAMENTE un objeto JSON válido con este formato:
+    {{"decision": "<una de las opciones disponibles>", "razon": "<breve explicacion de 5 palabras>"}}
+    """
+
+  decision_final = 'disparo'
+  razon = 'Instinto de supervivencia'
+
+  try:
+    if client_gemini:
+      response = client_gemini.models.generate_content(
+          model='gemini-2.5-flash',
+          contents=prompt,
+      )
+      texto_limpio = (
+          response.text.strip().replace('```json', '').replace('```', '')
+      )
+      resultado = json.loads(texto_limpio)
+      if resultado.get('decision') in opciones_disponibles:
+        decision_final = resultado['decision']
+        razon = resultado.get('razon', 'Estrategia óptima')
+  except Exception as err:
+    print('Aviso API Gemini (usando fallback heurístico):', err)
+    # Fallback automático en caso de que la api_key 'hola' no conecte a internet
+    comodines_libres = [c for c in opciones_disponibles if c != 'disparo']
+    if comodines_libres:
+      decision_final = comodines_libres[0]
+      razon = 'Evasión táctica automática'
+
+  return jsonify({'decision': decision_final, 'razon': razon})
+
 if __name__ == '__main__':
     app.run(debug=True)
