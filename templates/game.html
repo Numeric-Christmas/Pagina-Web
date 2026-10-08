@@ -27,7 +27,7 @@
     <!-- Casillero de Registro -->
     <div class="card p-2 shadow-sm border rounded-3 mb-2">
         <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cris admin" maxlength="40">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cristian" maxlength="40">
             <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
         </div>
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
@@ -105,6 +105,7 @@
     let participantesBase = [];
     let participantes = [];
     let impactos = {};
+    let partidaEnCurso = false;
 
     // Comodines del usuario
     let comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
@@ -124,17 +125,17 @@
     let girando = false;
 
     function desbloquearAudio() {
-    const audios = [
-        document.getElementById('sndDisparo'),
-        document.getElementById('sndVacio'),
-        document.getElementById('sndFreezer')
-    ];
-    audios.forEach(a => {
-        if (a) {
-            a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
-        }
-    });
-}
+        const audios = [
+            document.getElementById('sndDisparo'),
+            document.getElementById('sndVacio'),
+            document.getElementById('sndFreezer')
+        ];
+        audios.forEach(a => {
+            if (a) {
+                a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+            }
+        });
+    }
     document.addEventListener('click', desbloquearAudio, { once: true });
 
     function inicializarTambor() {
@@ -153,6 +154,30 @@
         document.getElementById('tirosRestantes').innerText = `${12 - tiroActual} / 12`;
     }
 
+    // Bloquear el acceso a nuevos usuarios cuando la partida inicia
+    function bloquearIngreso() {
+        partidaEnCurso = true;
+        const btnListo = document.getElementById('btnListo');
+        const inputNombre = document.getElementById('inputNombre');
+        
+        if (!miNombre) {
+            if (btnListo) {
+                btnListo.disabled = true;
+                btnListo.innerText = "Cerrado 🔒";
+            }
+            if (inputNombre) {
+                inputNombre.disabled = true;
+                inputNombre.placeholder = "Partida en curso...";
+            }
+            const msg = document.getElementById('msgConfirmacion');
+            if (msg) {
+                msg.className = "small text-danger mt-1";
+                msg.innerText = "🚫 La partida ya inició. Espera a la siguiente ronda.";
+                msg.classList.remove('d-none');
+            }
+        }
+    }
+
     // 1. Canal Realtime
     const canal = client.channel('sala-ruleta');
 
@@ -161,6 +186,7 @@
             cargarParticipantes();
         })
         .on('broadcast', { event: 'girar_inicial' }, (payload) => {
+            bloquearIngreso();
             ejecutarAnimacionGiro(payload.payload.totalGiro, payload.payload.jugadorApuntado);
         })
         .on('broadcast', { event: 'ejecutar_decision' }, (payload) => {
@@ -196,6 +222,11 @@
 
     // 3. Registrar al usuario
     async function unirse() {
+        if (partidaEnCurso) {
+            alert("La partida ya ha iniciado. No puedes unirte en este momento.");
+            return;
+        }
+
         desbloquearAudio();
 
         const input = document.getElementById('inputNombre');
@@ -301,6 +332,8 @@
             return;
         }
 
+        bloquearIngreso();
+
         document.getElementById('alertaResultado').classList.add('d-none');
 
         const n = participantes.length;
@@ -393,10 +426,20 @@
                         comodinesCerebro[resJson.decision] = false;
                     }
 
-                    // Pausa dramática para que se disfrute el audio mientras "piensa" (~2.5 segundos)
-                    setTimeout(() => {
+                    // Función que ejecuta la jugada
+                    const procesarJugada = () => {
                         ejecutarDecisionBot(resJson.decision, resJson.razon);
-                    }, 500);
+                    };
+
+                    // ESPERAR A QUE EL AUDIO TERMINE POR COMPLETO
+                    if (sndFreezer && !sndFreezer.paused && !sndFreezer.ended) {
+                        sndFreezer.onended = () => {
+                            sndFreezer.onended = null;
+                            procesarJugada();
+                        };
+                    } else {
+                        procesarJugada();
+                    }
 
                 } catch (e) {
                     console.error("Error consultando bot:", e);
@@ -607,12 +650,41 @@
 
     function resetearEstadoLocal() {
         inicializarTambor();
+        partidaEnCurso = false;
+        anguloActual = 0; // Corrige la alineación de la ruleta en todos los clientes
+        miNombre = "";
         impactos = {};
         comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
         comodinesCerebro = { antihorario: true, horario: true, opuesto: true };
         participantes.forEach(p => impactos[p] = 0);
         document.getElementById('alertaResultado').classList.add('d-none');
         desactivarPanelVertical();
+
+        // Detener audio freezer si estuviese reproduciéndose
+        const sndFreezer = document.getElementById('sndFreezer');
+        if (sndFreezer) {
+            sndFreezer.pause();
+            sndFreezer.currentTime = 0;
+            sndFreezer.onended = null;
+        }
+
+        // Habilitar de nuevo el registro
+        const input = document.getElementById('inputNombre');
+        const btnListo = document.getElementById('btnListo');
+        const msg = document.getElementById('msgConfirmacion');
+        if (input) {
+            input.disabled = false;
+            input.value = "";
+            input.placeholder = "Ej: Cristian";
+        }
+        if (btnListo) {
+            btnListo.disabled = false;
+            btnListo.innerText = "Listo ✅";
+        }
+        if (msg) {
+            msg.classList.add('d-none');
+        }
+
         const btn = document.getElementById('btnGirar');
         if (btn) {
             btn.disabled = false;
@@ -632,11 +704,6 @@
                 payload: {}
             });
 
-            document.getElementById('inputNombre').disabled = false;
-            document.getElementById('btnListo').disabled = false;
-            document.getElementById('msgConfirmacion').classList.add('d-none');
-            document.getElementById('inputNombre').value = "";
-            anguloActual = 0;
             resetearEstadoLocal();
         }
     }
