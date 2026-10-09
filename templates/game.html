@@ -6,8 +6,15 @@
     <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
     <audio id="sndVacio" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
     <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
+    <audio id="sndFondo" preload="auto" loop src="{{ url_for('static', filename='audio/sound.mp3') }}"></audio>
 
-    <h2 class="fw-bold text-danger mb-1 fs-4">🎯 Ruleta Rusa en Vivo</h2>
+    <!-- Encabezado con Botón de Silencio para sound.mp3 -->
+    <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
+        <h2 class="fw-bold text-danger m-0 fs-4">🎯 Ruleta Rusa en Vivo</h2>
+        <button id="btnMuteMusica" class="btn btn-sm btn-outline-secondary border-0 p-1" style="font-size: 1.15rem; line-height: 1;" onclick="toggleSilencioMusica()" title="Silenciar música de fondo">
+            🔇
+        </button>
+    </div>
     <p class="text-muted small mb-2" style="font-size: 0.75rem;">Tambor de 12 recámaras (10 balas y 2 vacías). 3 impactos eliminan al jugador.</p>
 
     <!-- Marcador de Tambor y Balas -->
@@ -33,6 +40,11 @@
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
             ¡Listo! Esperando el giro de la ruleta.
         </div>
+    </div>
+
+    <!-- Temporizador visual de decisión (10s) -->
+    <div id="badgeTemporizador" class="badge bg-danger p-2 fs-6 mb-2 d-none shadow-sm">
+        ⏳ Tiempo para decidir: <span id="segundosRestantes">10</span>s
     </div>
 
     <!-- ÁREA COMPACTA: PISTOLA + RULETA + BOTONES EMOJIS VERTICALES -->
@@ -107,9 +119,15 @@
     let impactos = {};
     let partidaEnCurso = false;
 
-    // Comodines del usuario
+    // Estado individual de silencio para sound.mp3
+    let musicaSilenciada = false;
+
+    // Temporizador de 10s
+    let intervaloTimer = null;
+    let tiempoRestante = 10;
+
+    // Comodines del usuario y del bot Cerebro
     let comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
-    // Comodines del bot Cerebro
     let comodinesCerebro = { antihorario: true, horario: true, opuesto: true };
 
     let tambor = [];
@@ -128,7 +146,8 @@
         const audios = [
             document.getElementById('sndDisparo'),
             document.getElementById('sndVacio'),
-            document.getElementById('sndFreezer')
+            document.getElementById('sndFreezer'),
+            document.getElementById('sndFondo')
         ];
         audios.forEach(a => {
             if (a) {
@@ -137,6 +156,39 @@
         });
     }
     document.addEventListener('click', desbloquearAudio, { once: true });
+
+    // Alternar silencio de sound.mp3 exclusivamente
+    function toggleSilencioMusica() {
+        musicaSilenciada = !musicaSilenciada;
+        const bgm = document.getElementById('sndFondo');
+        const btnMute = document.getElementById('btnMuteMusica');
+
+        if (bgm) {
+            bgm.muted = musicaSilenciada;
+        }
+
+        if (btnMute) {
+            btnMute.innerText = musicaSilenciada ? "🔊" : "🔇";
+            btnMute.title = musicaSilenciada ? "Activar música de fondo" : "Silenciar música de fondo";
+        }
+    }
+
+    function reproducirMusicaFondo() {
+        const bgm = document.getElementById('sndFondo');
+        if (bgm && bgm.paused) {
+            bgm.volume = 0.4;
+            bgm.muted = musicaSilenciada; // Respeta la preferencia del jugador
+            bgm.play().catch(e => console.log("Audio de fondo en espera:", e));
+        }
+    }
+
+    function detenerMusicaFondo() {
+        const bgm = document.getElementById('sndFondo');
+        if (bgm) {
+            bgm.pause();
+            bgm.currentTime = 0;
+        }
+    }
 
     function inicializarTambor() {
         tambor = [true, true, true, true, true, true, true, true, true, true, false, false];
@@ -154,8 +206,7 @@
         document.getElementById('tirosRestantes').innerText = `${12 - tiroActual} / 12`;
     }
 
-    // Bloquear el acceso a nuevos usuarios cuando la partida inicia
-    function bloquearIngreso() {
+    function bloquearFormularioIngreso() {
         partidaEnCurso = true;
         const btnListo = document.getElementById('btnListo');
         const inputNombre = document.getElementById('inputNombre');
@@ -172,8 +223,24 @@
             const msg = document.getElementById('msgConfirmacion');
             if (msg) {
                 msg.className = "small text-danger mt-1";
-                msg.innerText = "🚫 La partida ya inició. Espera a la siguiente ronda.";
+                msg.innerText = "🚫 La partida ya inició. No se admiten nuevos participantes.";
                 msg.classList.remove('d-none');
+            }
+        }
+    }
+
+    async function cargarEstadoPartida() {
+        const { data, error } = await client
+            .from('estado_ruleta')
+            .select('en_curso')
+            .eq('id', 1)
+            .maybeSingle();
+
+        if (!error && data) {
+            partidaEnCurso = data.en_curso;
+            if (partidaEnCurso) {
+                bloquearFormularioIngreso();
+                reproducirMusicaFondo();
             }
         }
     }
@@ -185,8 +252,21 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_ruleta' }, () => {
             cargarParticipantes();
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'estado_ruleta' }, (payload) => {
+            if (payload.new && payload.new.en_curso !== undefined) {
+                partidaEnCurso = payload.new.en_curso;
+                if (partidaEnCurso) {
+                    bloquearFormularioIngreso();
+                    reproducirMusicaFondo();
+                }
+            }
+        })
+        .on('broadcast', { event: 'nuevo_participante' }, () => {
+            cargarParticipantes();
+        })
         .on('broadcast', { event: 'girar_inicial' }, (payload) => {
-            bloquearIngreso();
+            bloquearFormularioIngreso();
+            reproducirMusicaFondo();
             ejecutarAnimacionGiro(payload.payload.totalGiro, payload.payload.jugadorApuntado);
         })
         .on('broadcast', { event: 'ejecutar_decision' }, (payload) => {
@@ -253,6 +333,17 @@
                 document.getElementById('panelAdmin').classList.remove('d-none');
                 document.getElementById('panelEspera').classList.add('d-none');
             }
+
+            await cargarParticipantes();
+
+            canal.send({
+                type: 'broadcast',
+                event: 'nuevo_participante',
+                payload: {}
+            });
+        } else {
+            console.error("Error al registrarse:", error);
+            alert("Hubo un error al unirse a la sala. Inténtalo de nuevo.");
         }
     }
 
@@ -290,7 +381,6 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Texto dentro de la porción
             ctx.save();
             ctx.translate(centro, centro);
             ctx.rotate(anguloInicio + arco / 2);
@@ -321,7 +411,7 @@
     }
 
     // 5. El anfitrión gira la ruleta
-    function lanzarGiro() {
+    async function lanzarGiro() {
         if (girando || enEsperaDecision || juegoTerminado) return;
         if (participantes.length < 2) {
             alert("Se necesitan al menos 2 participantes para jugar.");
@@ -332,7 +422,12 @@
             return;
         }
 
-        bloquearIngreso();
+        reproducirMusicaFondo();
+
+        if (!partidaEnCurso) {
+            await client.from('estado_ruleta').update({ en_curso: true }).eq('id', 1);
+        }
+        bloquearFormularioIngreso();
 
         document.getElementById('alertaResultado').classList.add('d-none');
 
@@ -399,14 +494,12 @@
         if (jugadorApuntadoActual.includes("Cerebro")) {
             cartel.innerHTML = `🤖 La pistola apunta a Cerebro. Pensando jugada...`;
 
-            // Reproducir freezer.mp3
             const sndFreezer = document.getElementById('sndFreezer');
             if (sndFreezer) {
                 sndFreezer.currentTime = 0;
                 sndFreezer.play().catch(e => console.log("Audio freezer bloqueado:", e));
             }
             
-            // Solo el anfitrión ejecuta la consulta a la API para evitar peticiones duplicadas
             if (esAdmin) {
                 try {
                     const idxCerebro = participantes.indexOf(jugadorApuntadoActual);
@@ -426,12 +519,10 @@
                         comodinesCerebro[resJson.decision] = false;
                     }
 
-                    // Función que ejecuta la jugada
                     const procesarJugada = () => {
                         ejecutarDecisionBot(resJson.decision, resJson.razon);
                     };
 
-                    // ESPERAR A QUE EL AUDIO TERMINE POR COMPLETO
                     if (sndFreezer && !sndFreezer.paused && !sndFreezer.ended) {
                         sndFreezer.onended = () => {
                             sndFreezer.onended = null;
@@ -449,14 +540,56 @@
             return;
         }
 
-        // CASO 2: La pistola apunta a un jugador humano
+        // CASO 2: La pistola apunta a un jugador humano (Activar temporizador de 10s)
         cartel.innerHTML = `⚠️ Pistola apuntando a <span class="text-decoration-underline">${jugadorApuntadoActual}</span>. Decidiendo...`;
         
         if (miNombre === jugadorApuntadoActual) {
             activarPanelVertical();
+            iniciarTemporizadorDecision();
         } else {
             desactivarPanelVertical();
         }
+    }
+
+    function iniciarTemporizadorDecision() {
+        detenerTemporizadorDecision();
+        tiempoRestante = 10;
+        
+        const badge = document.getElementById('badgeTemporizador');
+        const segs = document.getElementById('segundosRestantes');
+        if (badge && segs) {
+            segs.innerText = tiempoRestante;
+            badge.classList.remove('d-none');
+        }
+
+        intervaloTimer = setInterval(() => {
+            tiempoRestante--;
+            if (segs) segs.innerText = tiempoRestante;
+
+            if (tiempoRestante <= 0) {
+                detenerTemporizadorDecision();
+                tomarDecisionAleatoriaPorTiempo();
+            }
+        }, 1000);
+    }
+
+    function detenerTemporizadorDecision() {
+        if (intervaloTimer) {
+            clearInterval(intervaloTimer);
+            intervaloTimer = null;
+        }
+        const badge = document.getElementById('badgeTemporizador');
+        if (badge) badge.classList.add('d-none');
+    }
+
+    function tomarDecisionAleatoriaPorTiempo() {
+        const opciones = ['disparo'];
+        if (comodinesDisponibles.antihorario) opciones.push('antihorario');
+        if (comodinesDisponibles.horario) opciones.push('horario');
+        if (comodinesDisponibles.opuesto) opciones.push('opuesto');
+
+        const eleccionAzar = opciones[Math.floor(Math.random() * opciones.length)];
+        tomarDecision(eleccionAzar, true);
     }
 
     function activarPanelVertical() {
@@ -470,13 +603,15 @@
     }
 
     function desactivarPanelVertical() {
+        detenerTemporizadorDecision();
         const panel = document.getElementById('panelTurnoAccion');
         panel.classList.add('opacity-25');
         panel.style.pointerEvents = 'none';
     }
 
     // 8. Decisión tomada por un Humano
-    function tomarDecision(tipo) {
+    function tomarDecision(tipo, porTiempo = false) {
+        detenerTemporizadorDecision();
         desactivarPanelVertical();
 
         const n = participantes.length;
@@ -495,6 +630,7 @@
         }
 
         const esBalaReal = tambor[tiroActual];
+        const razonTexto = porTiempo ? "Tiempo agotado (10s)" : "";
 
         canal.send({
             type: 'broadcast',
@@ -504,7 +640,7 @@
                 giroModificador: giroModificador,
                 jugadorOrigen: jugadorApuntadoActual,
                 esBalaReal: esBalaReal,
-                razon: ""
+                razon: razonTexto
             }
         });
 
@@ -513,7 +649,7 @@
             giroModificador: giroModificador,
             jugadorOrigen: jugadorApuntadoActual,
             esBalaReal: esBalaReal,
-            razon: ""
+            razon: razonTexto
         });
     }
 
@@ -552,6 +688,8 @@
 
     // 9. Aplicar animación de comodín y disparar
     function aplicarDecisionGlobal(data) {
+        detenerTemporizadorDecision();
+
         if (data.giroModificador !== 0) {
             const duracion = 1200;
             const inicio = performance.now();
@@ -609,7 +747,7 @@
         if (data.tipo !== 'disparo') {
             const icono = data.tipo === 'antihorario' ? '🔄' : (data.tipo === 'horario' ? '🔃' : '↔️');
             detalle = ` (${data.jugadorOrigen} usó ${icono} ${data.tipo})`;
-            if (data.razon) detalle += ` [Cerebro: ${data.razon}]`;
+            if (data.razon) detalle += ` [${data.razon}]`;
         }
 
         if (data.esBalaReal) {
@@ -650,17 +788,22 @@
 
     function resetearEstadoLocal() {
         inicializarTambor();
+        detenerTemporizadorDecision();
+        detenerMusicaFondo();
         partidaEnCurso = false;
-        anguloActual = 0; // Corrige la alineación de la ruleta en todos los clientes
+        anguloActual = 0;
         miNombre = "";
+        
+        participantesBase = [];
+        participantes = [];
         impactos = {};
+        
         comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
         comodinesCerebro = { antihorario: true, horario: true, opuesto: true };
-        participantes.forEach(p => impactos[p] = 0);
+        
         document.getElementById('alertaResultado').classList.add('d-none');
         desactivarPanelVertical();
 
-        // Detener audio freezer si estuviese reproduciéndose
         const sndFreezer = document.getElementById('sndFreezer');
         if (sndFreezer) {
             sndFreezer.pause();
@@ -668,7 +811,6 @@
             sndFreezer.onended = null;
         }
 
-        // Habilitar de nuevo el registro
         const input = document.getElementById('inputNombre');
         const btnListo = document.getElementById('btnListo');
         const msg = document.getElementById('msgConfirmacion');
@@ -693,22 +835,30 @@
         actualizarUI();
     }
 
-    // 11. Reiniciar
+    // 11. Reiniciar para todos y resetear la BD en Supabase
     async function reiniciarRuleta() {
-        if (confirm("¿Deseas reiniciar la partida para todos?")) {
-            await client.from('participantes_ruleta').delete().neq('id', 0);
+        if (!confirm("¿Deseas reiniciar la partida para todos?")) return;
 
-            canal.send({
+        try {
+            await client.from('participantes_ruleta').delete().neq('id', 0);
+            await client.from('estado_ruleta').update({ en_curso: false }).eq('id', 1);
+
+            await canal.send({
                 type: 'broadcast',
                 event: 'reiniciar',
                 payload: {}
             });
 
             resetearEstadoLocal();
+
+        } catch (error) {
+            console.error("Error al reiniciar la partida:", error);
+            alert("Ocurrió un error al reiniciar la partida. Intenta nuevamente.");
         }
     }
 
     inicializarTambor();
     cargarParticipantes();
+    cargarEstadoPartida();
 </script>
 {% endblock %}
