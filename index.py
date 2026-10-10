@@ -180,11 +180,13 @@ def game():
 
 import json
 import os
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from google import genai
 
+load_dotenv()
 # Tu api_key proporcionada
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyAJSy3PL5fPekLRDNqSGLkL4seEc44BJG8")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # Inicializamos el cliente de Google GenAI
 client_gemini = None

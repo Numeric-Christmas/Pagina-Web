@@ -756,8 +756,8 @@
 
             if (cantBalas >= 3) {
                 juegoTerminado = true;
-                cartel.innerHTML = `☠️ FIN DEL JUEGO: <span class="text-decoration-underline">${afectado}</span> ha sido ELIMINADO.`;
-                bloquearBoton();
+                const textoFinal = obtenerTextoGanador();
+                cartel.innerHTML = `☠️ FIN DEL JUEGO: <span class="text-decoration-underline">${afectado}</span> ha sido ELIMINADO.${textoFinal}`;bloquearBoton();
                 return;
             }
         } else {
@@ -768,7 +768,8 @@
         if (tiroActual >= 12 && !juegoTerminado) {
             juegoTerminado = true;
             cartel.className = "alert alert-warning mt-2 fw-bold fs-6 shadow-sm py-2";
-            cartel.innerHTML = `🏁 ¡FIN DEL JUEGO! Se agotaron los 12 tiros.`;
+            const textoFinal = obtenerTextoGanador();
+            cartel.innerHTML = `🏁 ¡FIN DEL JUEGO! Se agotaron los 12 tiros.${textoFinal}`;
             bloquearBoton();
             return;
         }
@@ -856,6 +857,31 @@
             alert("Ocurrió un error al reiniciar la partida. Intenta nuevamente.");
         }
     }
+
+    // 12
+    function obtenerTextoGanador() {
+        if (participantes.length === 0) return "";
+
+        // Encontrar el menor número de impactos registrados
+        let menorImpactos = Infinity;
+        participantes.forEach(p => {
+            const balazos = impactos[p] || 0;
+            if (balazos < menorImpactos) {
+                menorImpactos = balazos;
+            }
+        });
+
+        // Filtrar todos los jugadores que tengan esa menor cantidad
+        const conMenosBalas = participantes.filter(p => (impactos[p] || 0) === menorImpactos);
+
+        // Si hay más de un jugador con la misma menor cantidad, hay empate
+        if (conMenosBalas.length > 1) {
+            return "<br><span class='fs-6 fw-normal'>🤝 EMPATE, NO HAY GANADORES</span>";
+        } else {
+            return `<br><span class='fs-6 fw-normal'>🗿 GANADOR SOBREVIVIENTE: <strong>${conMenosBalas[0]}</strong> (${menorImpactos} bala${menorImpactos === 1 ? '' : 's'})</span>`;
+        }
+    }
+    
 
     inicializarTambor();
     cargarParticipantes();
