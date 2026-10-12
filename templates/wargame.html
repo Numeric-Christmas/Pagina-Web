@@ -1,0 +1,793 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container py-2 text-center" style="max-width: 680px;">
+    <!-- Audios Locales -->
+    <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
+    <audio id="sndVacio" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+
+    <h2 class="fw-bold text-dark m-0 fs-4">💣 Guerra Estratégica por Niveles</h2>
+    <p class="text-muted small mb-2" style="font-size: 0.75rem;">
+        6 Niveles. Rojo vs Azul. Ambos bandos cuentan con paridad exacta de combatientes.
+    </p>
+
+    <!-- Casillero de Registro -->
+    <div class="card p-2 shadow-sm border rounded-3 mb-2">
+        <div class="input-group input-group-sm">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cris admin" maxlength="30">
+            <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
+        </div>
+        <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
+            ¡Registrado! Tu posición inicial ha sido asignada.
+        </div>
+    </div>
+
+    <!-- Panel de Anfitrión (Admin) -->
+    <div id="panelAdmin" class="mb-2 d-none">
+        <div class="d-flex justify-content-center gap-2">
+            <button id="btnAccionAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarRonda()">
+                🚀 INICIAR PARTIDA
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="reiniciarPartida()">
+                🗑️ Reiniciar
+            </button>
+        </div>
+    </div>
+
+    <!-- Temporizador & Estado de Fase -->
+    <div id="panelFase" class="alert alert-secondary py-1 px-3 small fw-bold mb-2 shadow-sm">
+        <span id="txtFase">Esperando participantes...</span>
+        <span id="badgeTimer" class="badge bg-danger ms-2 d-none">15s</span>
+    </div>
+
+    <!-- Comodines Disponibles del Jugador -->
+    <div id="misComodinesContainer" class="card p-1 shadow-sm border rounded-3 mb-2 bg-light d-none">
+        <div class="d-flex justify-content-center align-items-center gap-3 small">
+            <span class="text-muted fw-bold">Tus Comodines:</span>
+            <span id="badgeEscudo" class="badge bg-secondary">🛡️ Blindaje</span>
+            <span id="badgeSubir" class="badge bg-secondary">🔼 Subir</span>
+            <span id="badgeBajar" class="badge bg-secondary">🔽 Bajar</span>
+        </div>
+    </div>
+
+    <!-- Panel de Selección de Nivel (Emojis 1-6) -->
+    <div id="panelSelectorNivel" class="card p-2 shadow-sm border rounded-3 mb-2 opacity-25" style="pointer-events: none;">
+        <span id="lblSelectorNivel" class="text-muted small mb-1 d-block" style="font-size: 0.75rem;">Elige tu nivel:</span>
+        <div class="d-flex justify-content-center gap-2">
+            <button id="btnNvl1" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(1)">1️⃣</button>
+            <button id="btnNvl2" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(2)">2️⃣</button>
+            <button id="btnNvl3" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(3)">3️⃣</button>
+            <button id="btnNvl4" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(4)">4️⃣</button>
+            <button id="btnNvl5" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(5)">5️⃣</button>
+            <button id="btnNvl6" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(6)">6️⃣</button>
+        </div>
+    </div>
+
+    <!-- Panel de Supervivencia (🛡️, 🔼, 🔽) -->
+    <div id="panelDefensa" class="alert alert-warning py-2 mb-2 shadow-sm d-none">
+        <span class="fw-bold small d-block mb-1">⚠️ ¡BOMBA EN TU NIVEL! Usa un comodín (10s):</span>
+        <div class="d-flex justify-content-center gap-2">
+            <button id="btnComodinEscudo" class="btn btn-primary btn-sm fw-bold" onclick="usarComodin('escudo')">🛡️ Blindar</button>
+            <button id="btnComodinSubir" class="btn btn-success btn-sm fw-bold" onclick="usarComodin('subir')">🔼 Subir</button>
+            <button id="btnComodinBajar" class="btn btn-warning btn-sm fw-bold" onclick="usarComodin('bajar')">🔽 Bajar</button>
+        </div>
+    </div>
+
+    <!-- TABLERO DE LOS 6 NIVELES (ROJO vs AZUL) -->
+    <div class="row g-2 mb-3">
+        <!-- Lado Izquierdo (Rojo) -->
+        <div class="col-6">
+            <div class="p-1 rounded-top bg-danger text-white fw-bold small">🔴 EQUIPO ROJO (<span id="countIzq">0</span>)</div>
+            <div id="tableroIzq" class="d-flex flex-column gap-1 p-2 border border-danger rounded-bottom bg-light"></div>
+        </div>
+
+        <!-- Lado Derecho (Azul) -->
+        <div class="col-6">
+            <div class="p-1 rounded-top bg-primary text-white fw-bold small">🔵 EQUIPO AZUL (<span id="countDer">0</span>)</div>
+            <div id="tableroDer" class="d-flex flex-column gap-1 p-2 border border-primary rounded-bottom bg-light"></div>
+        </div>
+    </div>
+
+    <!-- Notificaciones / Resultado -->
+    <div id="alertaResultado" class="alert alert-secondary py-2 small fw-bold d-none shadow-sm mb-3"></div>
+
+    <!-- LISTA DE PARTICIPANTES AL FONDO DE LA PÁGINA -->
+    <div class="card p-2 shadow-sm border rounded-3 bg-light text-start">
+        <span class="fw-bold small text-muted text-uppercase mb-2 d-block text-center" style="letter-spacing: 0.5px; font-size: 0.75rem;">
+            📋 Lista de Participantes Confirmados
+        </span>
+        <div class="row g-2">
+            <!-- Columna Equipo Rojo -->
+            <div class="col-6">
+                <div class="border rounded p-2 bg-white" style="min-height: 90px;">
+                    <span class="text-danger fw-bold small d-block border-bottom pb-1 mb-2">🔴 Equipo Rojo</span>
+                    <ul id="listaParticipantesIzq" class="list-unstyled m-0 small"></ul>
+                </div>
+            </div>
+            <!-- Columna Equipo Azul -->
+            <div class="col-6">
+                <div class="border rounded p-2 bg-white" style="min-height: 90px;">
+                    <span class="text-primary fw-bold small d-block border-bottom pb-1 mb-2">🔵 Equipo Azul</span>
+                    <ul id="listaParticipantesDer" class="list-unstyled m-0 small"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://atvybxjsolqmadzojkfm.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0dnlieGpzb2xxbWFkem9qa2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MDg3NTgsImV4cCI6MjEwNDM4NDc1OH0.ks66J_l5S8DQ9FHxpc4e0INNDzCRlUyDb-vnH_l4WvM";
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let miNombre = "";
+    let miEquipo = ""; // 'izq' o 'der'
+    let esAdmin = false;
+    let partidaEnCurso = false;
+    let estoyEliminado = false;
+
+    let equipoIzq = [];
+    let equipoDer = [];
+    let eliminados = new Set();
+
+    let posiciones = {};
+    let comodinesUsadosRonda = {};
+
+    let bloqueadosIzq = new Set();
+    let bloqueadosDer = new Set();
+    let comodinesJugadores = {};
+
+    let nivelBombaAsignadaIzq = null;
+    let nivelBombaAsignadaDer = null;
+    let nivelObjetivoDisparoIzq = null;
+    let nivelObjetivoDisparoDer = null;
+
+    let avisoVacioIzq = null;
+    let avisoVacioDer = null;
+
+    let timerInterval = null;
+    let tiempoRestante = 15;
+    let accionSelectorModo = "";
+    let comodinElegidoRonda = null;
+
+    function desbloquearAudio() {
+        ['sndDisparo', 'sndVacio'].forEach(id => {
+            const a = document.getElementById(id);
+            if (a) a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+        });
+    }
+    document.addEventListener('click', desbloquearAudio, { once: true });
+
+    const canal = client.channel('sala-wargame-niveles');
+
+    canal
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_wargame' }, () => cargarParticipantes())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'estado_wargame' }, (p) => {
+            if (p.new && p.new.en_curso !== undefined) {
+                partidaEnCurso = p.new.en_curso;
+                if (partidaEnCurso) bloquearIngreso();
+            }
+        })
+        .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
+        .on('broadcast', { event: 'fase_posicionamiento' }, (p) => recibirFasePosicionamiento(p.payload))
+        .on('broadcast', { event: 'posicion_elegida' }, (p) => recibirPosicionElegida(p.payload))
+        .on('broadcast', { event: 'fase_ataque' }, (p) => recibirFaseAtaque(p.payload))
+        .on('broadcast', { event: 'objetivo_disparado' }, (p) => recibirObjetivoDisparado(p.payload))
+        .on('broadcast', { event: 'fase_defensa' }, (p) => recibirFaseDefensa(p.payload))
+        .on('broadcast', { event: 'comodin_aplicado' }, (p) => recibirComodinAplicado(p.payload))
+        .on('broadcast', { event: 'resolucion_ronda' }, (p) => recibirResolucionRonda(p.payload))
+        .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
+        .subscribe();
+
+    async function cargarParticipantes() {
+        const { data, error } = await client
+            .from('participantes_wargame')
+            .select('nombre, id')
+            .order('id', { ascending: true });
+
+        if (!error && data) {
+            equipoIzq = [];
+            equipoDer = [];
+
+            data.forEach((p, idx) => {
+                if (idx % 2 === 0) {
+                    equipoIzq.push(p.nombre);
+                } else {
+                    equipoDer.push(p.nombre);
+                }
+            });
+
+            // Si es impar, entra Cerebro al equipo azul para garantizar paridad exacta
+            const totalHumanos = data.length;
+            if (totalHumanos > 0 && totalHumanos % 2 !== 0) {
+                equipoDer.push("Cerebro");
+            }
+
+            if (miNombre) {
+                miEquipo = equipoIzq.includes(miNombre) ? 'izq' : 'der';
+            }
+
+            [...equipoIzq, ...equipoDer].forEach(nom => {
+                if (!posiciones[nom]) posiciones[nom] = 1;
+                if (!comodinesJugadores[nom]) {
+                    comodinesJugadores[nom] = { escudo: true, subir: true, bajar: true };
+                }
+            });
+
+            document.getElementById('countIzq').innerText = equipoIzq.length;
+            document.getElementById('countDer').innerText = equipoDer.length;
+
+            renderizarTableros(false);
+            renderizarListaParticipantes();
+        }
+    }
+
+    async function unirse() {
+        if (partidaEnCurso) return;
+        desbloquearAudio();
+
+        const input = document.getElementById('inputNombre');
+        const txt = input.value.trim();
+        if (!txt) return;
+
+        esAdmin = txt.toLowerCase().includes('admin');
+        const palabras = txt.split(/\s+/);
+        let nom = (palabras[0].toLowerCase() === 'admin' && palabras.length > 1) ? palabras[1] : palabras[0];
+        nom = nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase();
+        miNombre = nom;
+
+        const { error } = await client.from('participantes_wargame').insert([{ nombre: miNombre, equipo: 'temp' }]);
+        if (!error) {
+            bloquearIngreso();
+            posiciones[miNombre] = 1;
+            document.getElementById('msgConfirmacion').classList.remove('d-none');
+            document.getElementById('misComodinesContainer').classList.remove('d-none');
+            if (esAdmin) document.getElementById('panelAdmin').classList.remove('d-none');
+
+            await cargarParticipantes();
+            canal.send({ type: 'broadcast', event: 'nuevo_participante', payload: {} });
+        }
+    }
+
+    function bloquearIngreso() {
+        partidaEnCurso = true;
+        const b = document.getElementById('btnListo');
+        const inp = document.getElementById('inputNombre');
+        if (b) { b.disabled = true; b.innerText = "Cerrado 🔒"; }
+        if (inp) inp.disabled = true;
+    }
+
+    function renderizarListaParticipantes() {
+        const ulIzq = document.getElementById('listaParticipantesIzq');
+        const ulDer = document.getElementById('listaParticipantesDer');
+
+        const pintarLista = (lista, ulElement) => {
+            if (lista.length === 0) {
+                ulElement.innerHTML = `<li class="text-muted fst-italic">Sin jugadores</li>`;
+                return;
+            }
+            ulElement.innerHTML = lista.map(nom => {
+                const iconoMuerto = eliminados.has(nom) ? " 💥" : "";
+                const claseTexto = eliminados.has(nom) ? "text-decoration-line-through text-muted" : "fw-bold text-dark";
+                return `<li class="py-1 border-bottom border-light"><span class="${claseTexto}">${nom}</span>${iconoMuerto}</li>`;
+            }).join('');
+        };
+
+        pintarLista(equipoIzq, ulIzq);
+        pintarLista(equipoDer, ulDer);
+    }
+
+    function renderizarTableros(revelarAmbos = false) {
+        const dibujarLado = (equipo, colId, bloqueados, bombaEnNivel, bombaApuntada, vacioEnNivel) => {
+            const cont = document.getElementById(colId);
+            let html = "";
+
+            for (let lvl = 6; lvl >= 1; lvl--) {
+                const estaBloqueado = bloqueados.has(lvl);
+                const jugadoresEnNivel = equipo.filter(nom => posiciones[nom] === lvl && !eliminados.has(nom));
+
+                let etiquetaJugadores = "";
+                const puedoVer = revelarAmbos || (equipo === equipoIzq && miEquipo === 'izq') || (equipo === equipoDer && miEquipo === 'der');
+
+                if (puedoVer) {
+                    etiquetaJugadores = jugadoresEnNivel.map(nom => {
+                        const iconC = comodinesUsadosRonda[nom] ? ` ${comodinesUsadosRonda[nom]}` : "";
+                        return `<span class="badge bg-dark">${nom}${iconC}</span>`;
+                    }).join(' ');
+                }
+
+                if (vacioEnNivel === lvl) {
+                    etiquetaJugadores = `<span class="badge bg-warning text-dark fw-bold">💣vacío</span>`;
+                }
+
+                let iconoNivel = `${lvl}️⃣`;
+                if (estaBloqueado) iconoNivel = "❌";
+                if (bombaEnNivel === lvl && vacioEnNivel !== lvl) iconoNivel += " 💣";
+                if (bombaApuntada === lvl) iconoNivel += " 🎯";
+
+                const bgClass = estaBloqueado ? "bg-secondary-subtle opacity-50" : "bg-white";
+
+                html += `
+                    <div class="card p-1 shadow-sm border text-start ${bgClass}" style="min-height: 40px;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold small">${iconoNivel}</span>
+                            <div class="d-flex flex-wrap gap-1">${etiquetaJugadores}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            cont.innerHTML = html;
+        };
+
+        dibujarLado(equipoIzq, 'tableroIzq', bloqueadosIzq, nivelBombaAsignadaIzq, nivelObjetivoDisparoDer, avisoVacioIzq);
+        dibujarLado(equipoDer, 'tableroDer', bloqueadosDer, nivelBombaAsignadaDer, nivelObjetivoDisparoIzq, avisoVacioDer);
+        actualizarBadgesComodines();
+        renderizarListaParticipantes();
+    }
+
+    function actualizarBadgesComodines() {
+        if (!miNombre || !comodinesJugadores[miNombre]) return;
+        const c = comodinesJugadores[miNombre];
+        document.getElementById('badgeEscudo').className = c.escudo ? "badge bg-primary" : "badge bg-secondary opacity-25";
+        document.getElementById('badgeSubir').className = c.subir ? "badge bg-success" : "badge bg-secondary opacity-25";
+        document.getElementById('badgeBajar').className = c.bajar ? "badge bg-warning text-dark" : "badge bg-secondary opacity-25";
+    }
+
+    // FASE 1: POSICIONAMIENTO
+    async function iniciarRonda() {
+        if (!partidaEnCurso) {
+            await client.from('estado_wargame').update({ en_curso: true }).eq('id', 1);
+        }
+        partidaEnCurso = true;
+        bloquearIngreso();
+
+        canal.send({ type: 'broadcast', event: 'fase_posicionamiento', payload: {} });
+        recibirFasePosicionamiento({});
+    }
+
+    function recibirFasePosicionamiento(payload) {
+        nivelBombaAsignadaIzq = null;
+        nivelBombaAsignadaDer = null;
+        nivelObjetivoDisparoIzq = null;
+        nivelObjetivoDisparoDer = null;
+        comodinElegidoRonda = null;
+        comodinesUsadosRonda = {};
+        avisoVacioIzq = null;
+        avisoVacioDer = null;
+
+        document.getElementById('alertaResultado').classList.add('d-none');
+        document.getElementById('panelDefensa').classList.add('d-none');
+        document.getElementById('txtFase').innerText = "Fase 1: Escoge tu nivel (15s)";
+
+        if (!estoyEliminado) {
+            accionSelectorModo = "posicion";
+            document.getElementById('lblSelectorNivel').innerText = "Selecciona tu posición (puedes cambiar cuantas veces desees):";
+            habilitarSelectorNiveles(miEquipo === 'izq' ? bloqueadosIzq : bloqueadosDer);
+        }
+
+        renderizarTableros(false);
+        iniciarTemporizador(15, () => finalizarFasePosicionamiento());
+
+        if (esAdmin && equipoDer.includes("Cerebro")) {
+            const libres = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
+            fetch('/api/cerebro-accion-wargame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fase: "posicion", niveles_disponibles: libres })
+            }).then(r => r.json()).then(res => {
+                canal.send({ type: 'broadcast', event: 'posicion_elegida', payload: { jugador: 'Cerebro', nivel: res.eleccion } });
+                recibirPosicionElegida({ jugador: 'Cerebro', nivel: res.eleccion });
+            });
+        }
+    }
+
+    function seleccionarNivel(lvl) {
+        if (accionSelectorModo === "posicion") {
+            posiciones[miNombre] = lvl;
+            renderizarTableros(false);
+            canal.send({ type: 'broadcast', event: 'posicion_elegida', payload: { jugador: miNombre, nivel: lvl } });
+        } else if (accionSelectorModo === "ataque") {
+            deshabilitarSelectorNiveles();
+            canal.send({ type: 'broadcast', event: 'objetivo_disparado', payload: { jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl } });
+            recibirObjetivoDisparado({ jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl });
+        }
+    }
+
+    function recibirPosicionElegida(data) {
+        posiciones[data.jugador] = data.nivel;
+        renderizarTableros(false);
+    }
+
+    function finalizarFasePosicionamiento() {
+        deshabilitarSelectorNiveles();
+        if (esAdmin) {
+            setTimeout(iniciarFaseAtaque, 1000);
+        }
+    }
+
+    // FASE 2: ASIGNACIÓN Y USO DE BOMBAS
+    function iniciarFaseAtaque() {
+        const libresIzq = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosIzq.has(n));
+        const libresDer = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
+
+        const bombaIzq = libresIzq[Math.floor(Math.random() * libresIzq.length)];
+        const bombaDer = libresDer[Math.floor(Math.random() * libresDer.length)];
+
+        canal.send({
+            type: 'broadcast',
+            event: 'fase_ataque',
+            payload: { bombaIzq, bombaDer }
+        });
+        recibirFaseAtaque({ bombaIzq, bombaDer });
+    }
+
+    function recibirFaseAtaque(data) {
+        nivelBombaAsignadaIzq = data.bombaIzq;
+        nivelBombaAsignadaDer = data.bombaDer;
+
+        document.getElementById('txtFase').innerText = "Fase 2: Asignación de Bomba 💣";
+
+        const jugadoresConBombaIzq = equipoIzq.filter(nom => posiciones[nom] === nivelBombaAsignadaIzq && !eliminados.has(nom));
+        const jugadoresConBombaDer = equipoDer.filter(nom => posiciones[nom] === nivelBombaAsignadaDer && !eliminados.has(nom));
+
+        avisoVacioIzq = (jugadoresConBombaIzq.length === 0) ? nivelBombaAsignadaIzq : null;
+        avisoVacioDer = (jugadoresConBombaDer.length === 0) ? nivelBombaAsignadaDer : null;
+
+        renderizarTableros(false);
+
+        // AMBOS LADOS EN VACÍO: Salto directo sin conteo ni disparos
+        if (avisoVacioIzq !== null && avisoVacioDer !== null) {
+            if (esAdmin) {
+                setTimeout(() => {
+                    const dataRes = {
+                        bloqueadosIzq: Array.from(bloqueadosIzq),
+                        bloqueadosDer: Array.from(bloqueadosDer),
+                        eliminados: Array.from(eliminados),
+                        ambosVacios: true,
+                        comodinesUsados: {}
+                    };
+                    canal.send({ type: 'broadcast', event: 'resolucion_ronda', payload: dataRes });
+                    recibirResolucionRonda(dataRes);
+                }, 1500);
+            }
+            return;
+        }
+
+        const tengoBomba = (miEquipo === 'izq' && posiciones[miNombre] === nivelBombaAsignadaIzq) ||
+                           (miEquipo === 'der' && posiciones[miNombre] === nivelBombaAsignadaDer);
+
+        if (tengoBomba && !estoyEliminado) {
+            accionSelectorModo = "ataque";
+            document.getElementById('lblSelectorNivel').innerText = "¡Tienes la bomba 💣! Selecciona a ciegas qué nivel rival atacar:";
+            habilitarSelectorNiveles(miEquipo === 'izq' ? bloqueadosDer : bloqueadosIzq);
+        }
+
+        if (esAdmin && posiciones["Cerebro"] === nivelBombaAsignadaDer && !eliminados.has("Cerebro")) {
+            const libresOpuestos = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosIzq.has(n));
+            fetch('/api/cerebro-accion-wargame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fase: "ataque", niveles_disponibles: libresOpuestos })
+            }).then(r => r.json()).then(res => {
+                canal.send({ type: 'broadcast', event: 'objetivo_disparado', payload: { jugador: 'Cerebro', equipo: 'der', nivelObjetivo: res.eleccion } });
+                recibirObjetivoDisparado({ jugador: 'Cerebro', equipo: 'der', nivelObjetivo: res.eleccion });
+            });
+        }
+    }
+
+    function recibirObjetivoDisparado(data) {
+        if (data.equipo === 'izq') nivelObjetivoDisparoIzq = data.nivelObjetivo;
+        if (data.equipo === 'der') nivelObjetivoDisparoDer = data.nivelObjetivo;
+
+        if (esAdmin) {
+            verificarTransicionDefensa();
+        }
+    }
+
+    function verificarTransicionDefensa() {
+        const tieneTiradorIzq = equipoIzq.some(nom => posiciones[nom] === nivelBombaAsignadaIzq && !eliminados.has(nom));
+        const tieneTiradorDer = equipoDer.some(nom => posiciones[nom] === nivelBombaAsignadaDer && !eliminados.has(nom));
+
+        const izqListo = !tieneTiradorIzq || nivelObjetivoDisparoIzq !== null;
+        const derListo = !tieneTiradorDer || nivelObjetivoDisparoDer !== null;
+
+        if (izqListo && derListo) {
+            canal.send({
+                type: 'broadcast',
+                event: 'fase_defensa',
+                payload: { nivelObjetivoDisparoIzq, nivelObjetivoDisparoDer }
+            });
+            recibirFaseDefensa({ nivelObjetivoDisparoIzq, nivelObjetivoDisparoDer });
+        }
+    }
+
+    // FASE 3: SUPERVIVENCIA
+    function recibirFaseDefensa(data) {
+        nivelObjetivoDisparoIzq = data.nivelObjetivoDisparoIzq;
+        nivelObjetivoDisparoDer = data.nivelObjetivoDisparoDer;
+
+        document.getElementById('txtFase').innerText = "Fase 3: ¡Bombas ubicadas! Opciones de Supervivencia (10s)";
+        renderizarTableros(true);
+
+        const estoyBajoFuego = (miEquipo === 'izq' && posiciones[miNombre] === nivelObjetivoDisparoDer) ||
+                              (miEquipo === 'der' && posiciones[miNombre] === nivelObjetivoDisparoIzq);
+
+        if (estoyBajoFuego && !estoyEliminado) {
+            mostrarPanelDefensa();
+        }
+
+        iniciarTemporizador(10, () => finalizarFaseDefensa());
+
+        if (esAdmin && !eliminados.has("Cerebro")) {
+            if (posiciones["Cerebro"] === nivelObjetivoDisparoIzq) {
+                fetch('/api/cerebro-accion-wargame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fase: "defensa", comodines: comodinesJugadores["Cerebro"] })
+                }).then(r => r.json()).then(res => {
+                    if (res.eleccion) {
+                        canal.send({ type: 'broadcast', event: 'comodin_aplicado', payload: { jugador: 'Cerebro', comodin: res.eleccion } });
+                        recibirComodinAplicado({ jugador: 'Cerebro', comodin: res.eleccion });
+                    }
+                });
+            }
+        }
+    }
+
+    function mostrarPanelDefensa() {
+        const p = document.getElementById('panelDefensa');
+        const c = comodinesJugadores[miNombre];
+        const bloqueadosPropios = miEquipo === 'izq' ? bloqueadosIzq : bloqueadosDer;
+        const libres = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosPropios.has(n));
+        const hayOtrosNiveles = libres.length > 1;
+
+        document.getElementById('btnComodinEscudo').disabled = !c.escudo;
+        document.getElementById('btnComodinSubir').disabled = !c.subir || !hayOtrosNiveles;
+        document.getElementById('btnComodinBajar').disabled = !c.bajar || !hayOtrosNiveles;
+        p.classList.remove('d-none');
+    }
+
+    function usarComodin(tipo) {
+        if (comodinElegidoRonda !== null) return;
+        comodinElegidoRonda = tipo;
+        document.getElementById('panelDefensa').classList.add('d-none');
+
+        comodinesJugadores[miNombre][tipo] = false;
+        canal.send({ type: 'broadcast', event: 'comodin_aplicado', payload: { jugador: miNombre, comodin: tipo } });
+        recibirComodinAplicado({ jugador: miNombre, comodin: tipo });
+    }
+
+    function recibirComodinAplicado(data) {
+        if (comodinesJugadores[data.jugador]) {
+            comodinesJugadores[data.jugador][data.comodin] = false;
+        }
+
+        const iconMap = { 'escudo': '🛡️', 'subir': '🔼', 'bajar': '🔽' };
+        comodinesUsadosRonda[data.jugador] = iconMap[data.comodin] || "";
+
+        const lvlActual = posiciones[data.jugador];
+        const ladoBloqueados = equipoIzq.includes(data.jugador) ? bloqueadosIzq : bloqueadosDer;
+        const libres = [1, 2, 3, 4, 5, 6].filter(n => !ladoBloqueados.has(n));
+
+        if (libres.length > 1) {
+            if (data.comodin === 'subir') {
+                const superiores = libres.filter(n => n > lvlActual);
+                posiciones[data.jugador] = superiores.length > 0 ? superiores[0] : libres[0];
+            } else if (data.comodin === 'bajar') {
+                const inferiores = libres.filter(n => n < lvlActual);
+                posiciones[data.jugador] = inferiores.length > 0 ? inferiores[inferiores.length - 1] : libres[libres.length - 1];
+            }
+        }
+
+        renderizarTableros(true);
+    }
+
+    function finalizarFaseDefensa() {
+        document.getElementById('panelDefensa').classList.add('d-none');
+        if (esAdmin) {
+            resolverImpactosFinales();
+        }
+    }
+
+    // RESOLUCIÓN DE IMPACTOS
+    function resolverImpactosFinales() {
+        if (nivelObjetivoDisparoDer) {
+            const afectados = equipoIzq.filter(nom => posiciones[nom] === nivelObjetivoDisparoDer && !eliminados.has(nom));
+            if (afectados.length === 0) {
+                bloqueadosIzq.add(nivelObjetivoDisparoDer);
+            } else {
+                afectados.forEach(nom => {
+                    const usoEscudo = comodinesUsadosRonda[nom] === '🛡️';
+                    const tieneRestantes = Object.values(comodinesJugadores[nom]).some(v => v === true);
+                    if (!usoEscudo && !tieneRestantes) {
+                        eliminados.add(nom);
+                    }
+                });
+            }
+        }
+
+        if (nivelObjetivoDisparoIzq) {
+            const afectados = equipoDer.filter(nom => posiciones[nom] === nivelObjetivoDisparoIzq && !eliminados.has(nom));
+            if (afectados.length === 0) {
+                bloqueadosDer.add(nivelObjetivoDisparoIzq);
+            } else {
+                afectados.forEach(nom => {
+                    const usoEscudo = comodinesUsadosRonda[nom] === '🛡️';
+                    const tieneRestantes = Object.values(comodinesJugadores[nom]).some(v => v === true);
+                    if (!usoEscudo && !tieneRestantes) {
+                        eliminados.add(nom);
+                    }
+                });
+            }
+        }
+
+        const dataRes = {
+            bloqueadosIzq: Array.from(bloqueadosIzq),
+            bloqueadosDer: Array.from(bloqueadosDer),
+            eliminados: Array.from(eliminados),
+            comodinesUsados: comodinesUsadosRonda
+        };
+
+        canal.send({ type: 'broadcast', event: 'resolucion_ronda', payload: dataRes });
+        recibirResolucionRonda(dataRes);
+    }
+
+    function recibirResolucionRonda(data) {
+        bloqueadosIzq = new Set(data.bloqueadosIzq);
+        bloqueadosDer = new Set(data.bloqueadosDer);
+        eliminados = new Set(data.eliminados);
+        comodinesUsadosRonda = data.comodinesUsados || {};
+
+        if (eliminados.has(miNombre)) {
+            estoyEliminado = true;
+        }
+
+        renderizarTableros(true);
+
+        const alerta = document.getElementById('alertaResultado');
+        alerta.classList.remove('d-none');
+
+        // Si ambos lados tuvieron 💣vacío
+        if (data.ambosVacios) {
+            const s = document.getElementById('sndVacio');
+            if (s) { s.currentTime = 0; s.play().catch(() => {}); }
+
+            alerta.className = "alert alert-warning py-2 small fw-bold shadow-sm";
+            alerta.innerHTML = "💨 <strong>¡Ambas bombas cayeron en niveles vacíos!</strong> Nadie dispara en esta ronda.";
+
+            if (esAdmin) {
+                const btn = document.getElementById('btnAccionAdmin');
+                btn.innerText = "➡️ SIGUIENTE ROUND";
+                btn.disabled = false;
+            }
+            return;
+        }
+
+        const s = document.getElementById('sndDisparo');
+        if (s) { s.currentTime = 0; s.play().catch(() => {}); }
+
+        let reporteComodines = [];
+        for (const [jugador, icono] of Object.entries(comodinesUsadosRonda)) {
+            reporteComodines.push(`<strong>${jugador}</strong> usó ${icono}`);
+        }
+        const textoComodines = reporteComodines.length > 0 ? `<br><small>${reporteComodines.join(' | ')}</small>` : "";
+
+        const vivosIzq = equipoIzq.filter(n => !eliminados.has(n));
+        const vivosDer = equipoDer.filter(n => !eliminados.has(n));
+
+        const perdioPorPisosIzq = bloqueadosIzq.size >= 6;
+        const perdioPorPisosDer = bloqueadosDer.size >= 6;
+        const sinVivosIzq = vivosIzq.length === 0;
+        const sinVivosDer = vivosDer.length === 0;
+
+        if (perdioPorPisosIzq || perdioPorPisosDer || sinVivosIzq || sinVivosDer) {
+            let ganador = "";
+            let causa = "";
+
+            if ((perdioPorPisosIzq || sinVivosIzq) && (perdioPorPisosDer || sinVivosDer)) {
+                ganador = "🤝 EMPATE TOTAL: Ambos bandos sucumbieron.";
+            } else if (perdioPorPisosIzq || sinVivosIzq) {
+                causa = perdioPorPisosIzq ? "El Equipo Rojo se quedó sin niveles." : "El Equipo Rojo no tiene sobrevivientes.";
+                ganador = `🔵 ¡EQUIPO AZUL HA GANADO!<br><small class='fw-normal'>${causa}</small>`;
+            } else {
+                causa = perdioPorPisosDer ? "El Equipo Azul se quedó sin niveles." : "El Equipo Azul no tiene sobrevivientes.";
+                ganador = `🔴 ¡EQUIPO ROJO HA GANADO!<br><small class='fw-normal'>${causa}</small>`;
+            }
+
+            alerta.className = "alert alert-danger py-2 small fw-bold shadow-sm";
+            alerta.innerHTML = `🏁 <strong>FIN DE LA PARTIDA</strong><br>${ganador}${textoComodines}`;
+            if (esAdmin) document.getElementById('btnAccionAdmin').disabled = true;
+            return;
+        }
+
+        alerta.className = "alert alert-info py-2 small fw-bold shadow-sm";
+        alerta.innerHTML = `💥 Ronda concluida.${textoComodines}`;
+
+        if (esAdmin) {
+            const btn = document.getElementById('btnAccionAdmin');
+            btn.innerText = "➡️ SIGUIENTE ROUND";
+            btn.disabled = false;
+        }
+    }
+
+    function iniciarTemporizador(segundos, onComplete) {
+        clearInterval(timerInterval);
+        tiempoRestante = segundos;
+        const b = document.getElementById('badgeTimer');
+        b.innerText = `${tiempoRestante}s`;
+        b.classList.remove('d-none');
+
+        timerInterval = setInterval(() => {
+            tiempoRestante--;
+            b.innerText = `${tiempoRestante}s`;
+            if (tiempoRestante <= 0) {
+                clearInterval(timerInterval);
+                b.classList.add('d-none');
+                if (onComplete) onComplete();
+            }
+        }, 1000);
+    }
+
+    function habilitarSelectorNiveles(bloqueados) {
+        const p = document.getElementById('panelSelectorNivel');
+        p.classList.remove('opacity-25');
+        p.style.pointerEvents = 'auto';
+
+        for (let lvl = 1; lvl <= 6; lvl++) {
+            const btn = document.getElementById(`btnNvl${lvl}`);
+            if (btn) btn.disabled = bloqueados.has(lvl);
+        }
+    }
+
+    function deshabilitarSelectorNiveles() {
+        const p = document.getElementById('panelSelectorNivel');
+        p.classList.add('opacity-25');
+        p.style.pointerEvents = 'none';
+    }
+
+    function resetearEstadoLocal() {
+        clearInterval(timerInterval);
+        partidaEnCurso = false;
+        estoyEliminado = false;
+        miNombre = "";
+        miEquipo = "";
+        equipoIzq = [];
+        equipoDer = [];
+        eliminados.clear();
+        posiciones = {};
+        comodinesUsadosRonda = {};
+        bloqueadosIzq.clear();
+        bloqueadosDer.clear();
+        comodinesJugadores = {};
+        avisoVacioIzq = null;
+        avisoVacioDer = null;
+
+        document.getElementById('inputNombre').disabled = false;
+        document.getElementById('inputNombre').value = "";
+        document.getElementById('btnListo').disabled = false;
+        document.getElementById('btnListo').innerText = "Listo ✅";
+        document.getElementById('msgConfirmacion').classList.add('d-none');
+        document.getElementById('misComodinesContainer').classList.add('d-none');
+        document.getElementById('alertaResultado').classList.add('d-none');
+        document.getElementById('panelDefensa').classList.add('d-none');
+        deshabilitarSelectorNiveles();
+
+        const btnA = document.getElementById('btnAccionAdmin');
+        if (btnA) { btnA.disabled = false; btnA.innerText = "🚀 INICIAR PARTIDA"; }
+        document.getElementById('txtFase').innerText = "Esperando participantes...";
+
+        renderizarTableros(false);
+    }
+
+    async function reiniciarPartida() {
+        if (!confirm("¿Deseas reiniciar la partida para ambos lados?")) return;
+        await client.from('participantes_wargame').delete().neq('id', 0);
+        await client.from('estado_wargame').update({ en_curso: false }).eq('id', 1);
+        canal.send({ type: 'broadcast', event: 'reiniciar', payload: {} });
+        resetearEstadoLocal();
+    }
+
+    cargarParticipantes();
+</script>
+{% endblock %}

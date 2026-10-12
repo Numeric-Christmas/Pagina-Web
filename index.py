@@ -267,5 +267,32 @@ def bot_decision():
 
   return jsonify({'decision': decision_final, 'razon': razon})
 
+
+
+import random
+from flask import render_template, request, jsonify
+
+@app.route('/wargame')
+def wargame_view():
+    return render_template('wargame.html')
+
+@app.route('/api/cerebro-accion-wargame', methods=['POST'])
+def cerebro_accion_wargame():
+    data = request.get_json() or {}
+    fase = data.get("fase") # "posicion", "ataque" o "defensa"
+    niveles_disponibles = data.get("niveles_disponibles", [1, 2, 3, 4, 5, 6])
+    comodines = data.get("comodines", {"escudo": True, "subir": True, "bajar": True})
+
+    if fase == "posicion" or fase == "ataque":
+        eleccion = random.choice(niveles_disponibles) if niveles_disponibles else 1
+        return jsonify({"eleccion": eleccion})
+
+    elif fase == "defensa":
+        opciones = [k for k, v in comodines.items() if v]
+        eleccion = random.choice(opciones) if opciones else None
+        return jsonify({"eleccion": eleccion})
+
+    return jsonify({"eleccion": None})
+
 if __name__ == '__main__':
     app.run(debug=True)
