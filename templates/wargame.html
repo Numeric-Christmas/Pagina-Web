@@ -2,11 +2,21 @@
 
 {% block content %}
 <div class="container py-2 text-center" style="max-width: 680px;">
-    <!-- Audios Locales -->
+    <!-- Audios del Juego -->
+    <audio id="sndFondo" preload="auto" loop src="{{ url_for('static', filename='audio/sound.mp3') }}"></audio>
     <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
     <audio id="sndVacio" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+    <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
+    <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
 
-    <h2 class="fw-bold text-dark m-0 fs-4">💣 Guerra Estratégica por Niveles</h2>
+    <!-- Encabezado con Botón de Mute de Música -->
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <div style="width: 38px;"></div>
+        <h2 class="fw-bold text-dark m-0 fs-4">💣 Guerra Estratégica por Niveles</h2>
+        <button id="btnMuteMusica" class="btn btn-outline-dark btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
+            🔊
+        </button>
+    </div>
     <p class="text-muted small mb-2" style="font-size: 0.75rem;">
         6 Niveles. Rojo vs Azul. Ambos bandos cuentan con paridad exacta de combatientes.
     </p>
@@ -14,7 +24,7 @@
     <!-- Casillero de Registro -->
     <div class="card p-2 shadow-sm border rounded-3 mb-2">
         <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cris admin" maxlength="30">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cristian" maxlength="30">
             <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
         </div>
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
@@ -146,18 +156,46 @@
     let avisoVacioIzq = null;
     let avisoVacioDer = null;
 
+    let yaDisparoBomba = false;
+    let musicaSilenciada = false;
+
     let timerInterval = null;
     let tiempoRestante = 15;
     let accionSelectorModo = "";
     let comodinElegidoRonda = null;
 
     function desbloquearAudio() {
-        ['sndDisparo', 'sndVacio'].forEach(id => {
+        ['sndFondo', 'sndDisparo', 'sndVacio', 'sndFreezer', 'sndCooler'].forEach(id => {
             const a = document.getElementById(id);
-            if (a) a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+            if (a) {
+                a.play().then(() => {
+                    if (id !== 'sndFondo' || !partidaEnCurso) {
+                        a.pause();
+                        a.currentTime = 0;
+                    }
+                }).catch(() => {});
+            }
         });
     }
     document.addEventListener('click', desbloquearAudio, { once: true });
+
+    function toggleMuteMusica() {
+        const audio = document.getElementById('sndFondo');
+        const btn = document.getElementById('btnMuteMusica');
+        musicaSilenciada = !musicaSilenciada;
+        if (audio) audio.muted = musicaSilenciada;
+        if (btn) btn.innerText = musicaSilenciada ? "🔇" : "🔊";
+    }
+
+    function reproducirMusicaFondo() {
+        const audio = document.getElementById('sndFondo');
+        if (audio) {
+            audio.muted = musicaSilenciada;
+            if (audio.paused) {
+                audio.play().catch(() => {});
+            }
+        }
+    }
 
     const canal = client.channel('sala-wargame-niveles');
 
@@ -166,7 +204,9 @@
         .on('postgres_changes', { event: '*', schema: 'public', table: 'estado_wargame' }, (p) => {
             if (p.new && p.new.en_curso !== undefined) {
                 partidaEnCurso = p.new.en_curso;
-                if (partidaEnCurso) bloquearIngreso();
+                if (partidaEnCurso) {
+                    reproducirMusicaFondo();
+                }
             }
         })
         .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
@@ -176,6 +216,7 @@
         .on('broadcast', { event: 'objetivo_disparado' }, (p) => recibirObjetivoDisparado(p.payload))
         .on('broadcast', { event: 'fase_defensa' }, (p) => recibirFaseDefensa(p.payload))
         .on('broadcast', { event: 'comodin_aplicado' }, (p) => recibirComodinAplicado(p.payload))
+        .on('broadcast', { event: 'sonido_sentencia' }, (p) => reproducirSentencia(p.payload.tipo))
         .on('broadcast', { event: 'resolucion_ronda' }, (p) => recibirResolucionRonda(p.payload))
         .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
@@ -198,7 +239,6 @@
                 }
             });
 
-            // Si es impar, entra Cerebro para garantizar paridad exacta (n/2 cada lado)
             const totalHumanos = data.length;
             if (totalHumanos > 0 && totalHumanos % 2 !== 0) {
                 equipoDer.push("Cerebro");
@@ -224,7 +264,6 @@
     }
 
     async function unirse() {
-        if (partidaEnCurso) return;
         desbloquearAudio();
 
         const input = document.getElementById('inputNombre');
@@ -251,7 +290,6 @@
     }
 
     function bloquearIngreso() {
-        partidaEnCurso = true;
         const b = document.getElementById('btnListo');
         const inp = document.getElementById('inputNombre');
         if (b) { b.disabled = true; b.innerText = "Cerrado 🔒"; }
@@ -334,10 +372,11 @@
         document.getElementById('badgeBajar').className = c.bajar ? "badge bg-warning text-dark" : "badge bg-secondary opacity-25";
     }
 
-    // FASE 1: POSICIONAMIENTO DINÁMICO (3 * n SEGUNDOS)
+    // FASE 1: POSICIONAMIENTO
     async function iniciarRonda() {
         if (!partidaEnCurso) {
             await client.from('estado_wargame').update({ en_curso: true }).eq('id', 1);
+            reproducirMusicaFondo();
         }
         partidaEnCurso = true;
         bloquearIngreso();
@@ -360,6 +399,7 @@
         comodinesUsadosRonda = {};
         avisoVacioIzq = null;
         avisoVacioDer = null;
+        yaDisparoBomba = false;
 
         document.getElementById('alertaResultado').classList.add('d-none');
         document.getElementById('panelDefensa').classList.add('d-none');
@@ -393,6 +433,8 @@
             renderizarTableros(false);
             canal.send({ type: 'broadcast', event: 'posicion_elegida', payload: { jugador: miNombre, nivel: lvl } });
         } else if (accionSelectorModo === "ataque") {
+            if (yaDisparoBomba) return;
+            yaDisparoBomba = true;
             deshabilitarSelectorNiveles();
             canal.send({ type: 'broadcast', event: 'objetivo_disparado', payload: { jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl } });
             recibirObjetivoDisparado({ jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl });
@@ -411,7 +453,7 @@
         }
     }
 
-    // FASE 2: ASIGNACIÓN Y USO DE BOMBAS
+    // FASE 2: ATAQUE
     function iniciarFaseAtaque() {
         const libresIzq = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosIzq.has(n));
         const libresDer = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
@@ -439,7 +481,6 @@
         const izqVacio = (jugadoresConBombaIzq.length === 0);
         const derVacio = (jugadoresConBombaDer.length === 0);
 
-        // Mensaje visible solo si ambos están vacíos
         if (izqVacio && derVacio) {
             avisoVacioIzq = nivelBombaAsignadaIzq;
             avisoVacioDer = nivelBombaAsignadaDer;
@@ -488,8 +529,8 @@
     }
 
     function recibirObjetivoDisparado(data) {
-        if (data.equipo === 'izq') nivelObjetivoDisparoIzq = data.nivelObjetivo;
-        if (data.equipo === 'der') nivelObjetivoDisparoDer = data.nivelObjetivo;
+        if (data.equipo === 'izq' && nivelObjetivoDisparoIzq === null) nivelObjetivoDisparoIzq = data.nivelObjetivo;
+        if (data.equipo === 'der' && nivelObjetivoDisparoDer === null) nivelObjetivoDisparoDer = data.nivelObjetivo;
 
         if (esAdmin) {
             verificarTransicionDefensa();
@@ -528,9 +569,12 @@
             mostrarPanelDefensa();
         }
 
+        if (esAdmin) {
+            evaluarSentenciaInevitable();
+        }
+
         iniciarTemporizador(10, () => finalizarFaseDefensa());
 
-        // Manejo de Cerebro en defensa con verificación de niveles libres
         if (esAdmin && !eliminados.has("Cerebro")) {
             if (posiciones["Cerebro"] === nivelObjetivoDisparoIzq) {
                 const libresCerebro = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
@@ -549,6 +593,52 @@
                     }
                 });
             }
+        }
+    }
+
+    function evaluarSentenciaInevitable() {
+        const checkSentencia = (nombre, equipoLado, nivelObjetivo) => {
+            if (!nombre || eliminados.has(nombre) || posiciones[nombre] !== nivelObjetivo) return false;
+            const com = comodinesJugadores[nombre];
+            const blq = (equipoLado === 'izq') ? bloqueadosIzq : bloqueadosDer;
+            const libres = [1, 2, 3, 4, 5, 6].filter(n => !blq.has(n));
+            const puedeMoverse = libres.length > 1 && (com.subir || com.bajar);
+            const puedeBlindar = com.escudo;
+            return (!puedeMoverse && !puedeBlindar);
+        };
+
+        let condenaHumano = false;
+        let condenaCerebro = false;
+
+        if (equipoDer.includes("Cerebro") && checkSentencia("Cerebro", 'der', nivelObjetivoDisparoIzq)) {
+            condenaCerebro = true;
+        }
+
+        [...equipoIzq, ...equipoDer].forEach(nom => {
+            if (nom !== "Cerebro") {
+                const eq = equipoIzq.includes(nom) ? 'izq' : 'der';
+                const obj = (eq === 'izq') ? nivelObjetivoDisparoDer : nivelObjetivoDisparoIzq;
+                if (checkSentencia(nom, eq, obj)) {
+                    condenaHumano = true;
+                }
+            }
+        });
+
+        if (condenaCerebro) {
+            canal.send({ type: 'broadcast', event: 'sonido_sentencia', payload: { tipo: 'cooler' } });
+            reproducirSentencia('cooler');
+        } else if (condenaHumano) {
+            canal.send({ type: 'broadcast', event: 'sonido_sentencia', payload: { tipo: 'freezer' } });
+            reproducirSentencia('freezer');
+        }
+    }
+
+    function reproducirSentencia(tipo) {
+        const id = (tipo === 'cooler') ? 'sndCooler' : 'sndFreezer';
+        const snd = document.getElementById(id);
+        if (snd) {
+            snd.currentTime = 0;
+            snd.play().catch(() => {});
         }
     }
 
@@ -609,45 +699,28 @@
 
     // RESOLUCIÓN DE IMPACTOS
     function resolverImpactosFinales() {
-        // Lado Izquierdo (bajo ataque de Derecha)
         if (nivelObjetivoDisparoDer) {
             const afectados = equipoIzq.filter(nom => posiciones[nom] === nivelObjetivoDisparoDer && !eliminados.has(nom));
             if (afectados.length === 0) {
-                // Nivel vacío impactado por bomba: se bloquea
                 bloqueadosIzq.add(nivelObjetivoDisparoDer);
             } else {
-                let nivelSalvado = false;
-                afectados.forEach(nom => {
-                    const usoEscudo = (comodinesUsadosRonda[nom] === '🛡️');
-                    if (usoEscudo) {
-                        nivelSalvado = true; // Escudo salva el nivel
-                    } else {
-                        eliminados.add(nom); // Sin escudo y en el piso atacado: eliminado
-                    }
-                });
-                if (!nivelSalvado) {
+                const nivelSalvadoPorEscudo = afectados.some(nom => comodinesUsadosRonda[nom] === '🛡️');
+                if (!nivelSalvadoPorEscudo) {
                     bloqueadosIzq.add(nivelObjetivoDisparoDer);
+                    afectados.forEach(nom => eliminados.add(nom));
                 }
             }
         }
 
-        // Lado Derecho (bajo ataque de Izquierda)
         if (nivelObjetivoDisparoIzq) {
             const afectados = equipoDer.filter(nom => posiciones[nom] === nivelObjetivoDisparoIzq && !eliminados.has(nom));
             if (afectados.length === 0) {
                 bloqueadosDer.add(nivelObjetivoDisparoIzq);
             } else {
-                let nivelSalvado = false;
-                afectados.forEach(nom => {
-                    const usoEscudo = (comodinesUsadosRonda[nom] === '🛡️');
-                    if (usoEscudo) {
-                        nivelSalvado = true; // Escudo salva el nivel
-                    } else {
-                        eliminados.add(nom); // Sin escudo y en el piso atacado: eliminado
-                    }
-                });
-                if (!nivelSalvado) {
+                const nivelSalvadoPorEscudo = afectados.some(nom => comodinesUsadosRonda[nom] === '🛡️');
+                if (!nivelSalvadoPorEscudo) {
                     bloqueadosDer.add(nivelObjetivoDisparoIzq);
+                    afectados.forEach(nom => eliminados.add(nom));
                 }
             }
         }
@@ -678,7 +751,6 @@
         const alerta = document.getElementById('alertaResultado');
         alerta.classList.remove('d-none');
 
-        // Caso donde ambos lados tuvieron 💣vacío simultáneamente
         if (data.ambosVacios) {
             const s = document.getElementById('sndVacio');
             if (s) { s.currentTime = 0; s.play().catch(() => {}); }
@@ -792,11 +864,25 @@
         comodinesJugadores = {};
         avisoVacioIzq = null;
         avisoVacioDer = null;
+        yaDisparoBomba = false;
 
-        document.getElementById('inputNombre').disabled = false;
-        document.getElementById('inputNombre').value = "";
-        document.getElementById('btnListo').disabled = false;
-        document.getElementById('btnListo').innerText = "Listo ✅";
+        const snd = document.getElementById('sndFondo');
+        if (snd) { snd.pause(); snd.currentTime = 0; }
+
+        const b = document.getElementById('btnListo');
+        if (b) {
+            b.disabled = false;
+            b.innerText = "Listo ✅";
+            b.classList.remove('btn-secondary');
+            b.classList.add('btn-success');
+        }
+        const inp = document.getElementById('inputNombre');
+        if (inp) {
+            inp.disabled = false;
+            inp.value = "";
+            inp.placeholder = "Ej: Cristian";
+        }
+
         document.getElementById('msgConfirmacion').classList.add('d-none');
         document.getElementById('misComodinesContainer').classList.add('d-none');
         document.getElementById('alertaResultado').classList.add('d-none');
