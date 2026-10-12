@@ -198,7 +198,7 @@
                 }
             });
 
-            // Si es impar, entra Cerebro al equipo azul para garantizar paridad exacta
+            // Si es impar, entra Cerebro para garantizar paridad exacta (n/2 cada lado)
             const totalHumanos = data.length;
             if (totalHumanos > 0 && totalHumanos % 2 !== 0) {
                 equipoDer.push("Cerebro");
@@ -334,7 +334,7 @@
         document.getElementById('badgeBajar').className = c.bajar ? "badge bg-warning text-dark" : "badge bg-secondary opacity-25";
     }
 
-    // FASE 1: POSICIONAMIENTO
+    // FASE 1: POSICIONAMIENTO DINÁMICO (3 * n SEGUNDOS)
     async function iniciarRonda() {
         if (!partidaEnCurso) {
             await client.from('estado_wargame').update({ en_curso: true }).eq('id', 1);
@@ -342,11 +342,16 @@
         partidaEnCurso = true;
         bloquearIngreso();
 
-        canal.send({ type: 'broadcast', event: 'fase_posicionamiento', payload: {} });
-        recibirFasePosicionamiento({});
+        const totalCombatientes = equipoIzq.length + equipoDer.length;
+        const tiempoFase1 = Math.max(3, 3 * totalCombatientes);
+
+        canal.send({ type: 'broadcast', event: 'fase_posicionamiento', payload: { duracion: tiempoFase1 } });
+        recibirFasePosicionamiento({ duracion: tiempoFase1 });
     }
 
     function recibirFasePosicionamiento(payload) {
+        const duracion = payload.duracion || (3 * (equipoIzq.length + equipoDer.length)) || 15;
+
         nivelBombaAsignadaIzq = null;
         nivelBombaAsignadaDer = null;
         nivelObjetivoDisparoIzq = null;
@@ -358,7 +363,7 @@
 
         document.getElementById('alertaResultado').classList.add('d-none');
         document.getElementById('panelDefensa').classList.add('d-none');
-        document.getElementById('txtFase').innerText = "Fase 1: Escoge tu nivel (15s)";
+        document.getElementById('txtFase').innerText = `Fase 1: Escoge tu nivel (${duracion}s)`;
 
         if (!estoyEliminado) {
             accionSelectorModo = "posicion";
@@ -367,7 +372,7 @@
         }
 
         renderizarTableros(false);
-        iniciarTemporizador(15, () => finalizarFasePosicionamiento());
+        iniciarTemporizador(duracion, () => finalizarFasePosicionamiento());
 
         if (esAdmin && equipoDer.includes("Cerebro")) {
             const libres = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
@@ -431,13 +436,15 @@
         const jugadoresConBombaIzq = equipoIzq.filter(nom => posiciones[nom] === nivelBombaAsignadaIzq && !eliminados.has(nom));
         const jugadoresConBombaDer = equipoDer.filter(nom => posiciones[nom] === nivelBombaAsignadaDer && !eliminados.has(nom));
 
-        avisoVacioIzq = (jugadoresConBombaIzq.length === 0) ? nivelBombaAsignadaIzq : null;
-        avisoVacioDer = (jugadoresConBombaDer.length === 0) ? nivelBombaAsignadaDer : null;
+        const izqVacio = (jugadoresConBombaIzq.length === 0);
+        const derVacio = (jugadoresConBombaDer.length === 0);
 
-        renderizarTableros(false);
+        // Mensaje visible solo si ambos están vacíos
+        if (izqVacio && derVacio) {
+            avisoVacioIzq = nivelBombaAsignadaIzq;
+            avisoVacioDer = nivelBombaAsignadaDer;
+            renderizarTableros(true);
 
-        // AMBOS LADOS EN VACÍO: Salto directo sin conteo ni disparos
-        if (avisoVacioIzq !== null && avisoVacioDer !== null) {
             if (esAdmin) {
                 setTimeout(() => {
                     const dataRes = {
@@ -453,6 +460,10 @@
             }
             return;
         }
+
+        avisoVacioIzq = null;
+        avisoVacioDer = null;
+        renderizarTableros(false);
 
         const tengoBomba = (miEquipo === 'izq' && posiciones[miNombre] === nivelBombaAsignadaIzq) ||
                            (miEquipo === 'der' && posiciones[miNombre] === nivelBombaAsignadaDer);
@@ -519,12 +530,18 @@
 
         iniciarTemporizador(10, () => finalizarFaseDefensa());
 
+        // Manejo de Cerebro en defensa con verificación de niveles libres
         if (esAdmin && !eliminados.has("Cerebro")) {
             if (posiciones["Cerebro"] === nivelObjetivoDisparoIzq) {
+                const libresCerebro = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
                 fetch('/api/cerebro-accion-wargame', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fase: "defensa", comodines: comodinesJugadores["Cerebro"] })
+                    body: JSON.stringify({ 
+                        fase: "defensa", 
+                        comodines: comodinesJugadores["Cerebro"],
+                        niveles_disponibles: libresCerebro
+                    })
                 }).then(r => r.json()).then(res => {
                     if (res.eleccion) {
                         canal.send({ type: 'broadcast', event: 'comodin_aplicado', payload: { jugador: 'Cerebro', comodin: res.eleccion } });
@@ -592,33 +609,46 @@
 
     // RESOLUCIÓN DE IMPACTOS
     function resolverImpactosFinales() {
+        // Lado Izquierdo (bajo ataque de Derecha)
         if (nivelObjetivoDisparoDer) {
             const afectados = equipoIzq.filter(nom => posiciones[nom] === nivelObjetivoDisparoDer && !eliminados.has(nom));
             if (afectados.length === 0) {
+                // Nivel vacío impactado por bomba: se bloquea
                 bloqueadosIzq.add(nivelObjetivoDisparoDer);
             } else {
+                let nivelSalvado = false;
                 afectados.forEach(nom => {
-                    const usoEscudo = comodinesUsadosRonda[nom] === '🛡️';
-                    const tieneRestantes = Object.values(comodinesJugadores[nom]).some(v => v === true);
-                    if (!usoEscudo && !tieneRestantes) {
-                        eliminados.add(nom);
+                    const usoEscudo = (comodinesUsadosRonda[nom] === '🛡️');
+                    if (usoEscudo) {
+                        nivelSalvado = true; // Escudo salva el nivel
+                    } else {
+                        eliminados.add(nom); // Sin escudo y en el piso atacado: eliminado
                     }
                 });
+                if (!nivelSalvado) {
+                    bloqueadosIzq.add(nivelObjetivoDisparoDer);
+                }
             }
         }
 
+        // Lado Derecho (bajo ataque de Izquierda)
         if (nivelObjetivoDisparoIzq) {
             const afectados = equipoDer.filter(nom => posiciones[nom] === nivelObjetivoDisparoIzq && !eliminados.has(nom));
             if (afectados.length === 0) {
                 bloqueadosDer.add(nivelObjetivoDisparoIzq);
             } else {
+                let nivelSalvado = false;
                 afectados.forEach(nom => {
-                    const usoEscudo = comodinesUsadosRonda[nom] === '🛡️';
-                    const tieneRestantes = Object.values(comodinesJugadores[nom]).some(v => v === true);
-                    if (!usoEscudo && !tieneRestantes) {
-                        eliminados.add(nom);
+                    const usoEscudo = (comodinesUsadosRonda[nom] === '🛡️');
+                    if (usoEscudo) {
+                        nivelSalvado = true; // Escudo salva el nivel
+                    } else {
+                        eliminados.add(nom); // Sin escudo y en el piso atacado: eliminado
                     }
                 });
+                if (!nivelSalvado) {
+                    bloqueadosDer.add(nivelObjetivoDisparoIzq);
+                }
             }
         }
 
@@ -648,7 +678,7 @@
         const alerta = document.getElementById('alertaResultado');
         alerta.classList.remove('d-none');
 
-        // Si ambos lados tuvieron 💣vacío
+        // Caso donde ambos lados tuvieron 💣vacío simultáneamente
         if (data.ambosVacios) {
             const s = document.getElementById('sndVacio');
             if (s) { s.currentTime = 0; s.play().catch(() => {}); }

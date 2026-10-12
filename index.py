@@ -279,7 +279,7 @@ def wargame_view():
 @app.route('/api/cerebro-accion-wargame', methods=['POST'])
 def cerebro_accion_wargame():
     data = request.get_json() or {}
-    fase = data.get("fase") # "posicion", "ataque" o "defensa"
+    fase = data.get("fase")
     niveles_disponibles = data.get("niveles_disponibles", [1, 2, 3, 4, 5, 6])
     comodines = data.get("comodines", {"escudo": True, "subir": True, "bajar": True})
 
@@ -288,7 +288,17 @@ def cerebro_accion_wargame():
         return jsonify({"eleccion": eleccion})
 
     elif fase == "defensa":
-        opciones = [k for k, v in comodines.items() if v]
+        # Si hay más de un piso libre, puede moverse o blindarse
+        # Si solo queda su propio piso libre, solo puede blindarse (escudo)
+        opciones = []
+        if comodines.get("escudo"):
+            opciones.append("escudo")
+        if len(niveles_disponibles) > 1:
+            if comodines.get("subir"):
+                opciones.append("subir")
+            if comodines.get("bajar"):
+                opciones.append("bajar")
+
         eleccion = random.choice(opciones) if opciones else None
         return jsonify({"eleccion": eleccion})
 
