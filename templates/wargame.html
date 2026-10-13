@@ -9,7 +9,7 @@
     <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
     <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
 
-    <!-- Encabezado con Botón de Mute de Música -->
+    <!-- Encabezado con Botón de Mute -->
     <div class="d-flex justify-content-between align-items-center mb-1">
         <div style="width: 38px;"></div>
         <h2 class="fw-bold text-dark m-0 fs-4">💣 Guerra Estratégica por Niveles</h2>
@@ -18,13 +18,13 @@
         </button>
     </div>
     <p class="text-muted small mb-2" style="font-size: 0.75rem;">
-        6 Niveles. Rojo vs Azul. Ambos bandos cuentan con paridad exacta de combatientes.
+        Tablero dinámico de <span id="lblTotalCeldas" class="fw-bold">6</span> celdas por bando. Rojo vs Azul.
     </p>
 
     <!-- Casillero de Registro -->
     <div class="card p-2 shadow-sm border rounded-3 mb-2">
         <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cristian" maxlength="30">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cris admin" maxlength="30">
             <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
         </div>
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
@@ -60,19 +60,6 @@
         </div>
     </div>
 
-    <!-- Panel de Selección de Nivel (Emojis 1-6) -->
-    <div id="panelSelectorNivel" class="card p-2 shadow-sm border rounded-3 mb-2 opacity-25" style="pointer-events: none;">
-        <span id="lblSelectorNivel" class="text-muted small mb-1 d-block" style="font-size: 0.75rem;">Elige tu nivel:</span>
-        <div class="d-flex justify-content-center gap-2">
-            <button id="btnNvl1" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(1)">1️⃣</button>
-            <button id="btnNvl2" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(2)">2️⃣</button>
-            <button id="btnNvl3" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(3)">3️⃣</button>
-            <button id="btnNvl4" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(4)">4️⃣</button>
-            <button id="btnNvl5" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(5)">5️⃣</button>
-            <button id="btnNvl6" class="btn btn-outline-dark btn-sm fs-5 p-1" onclick="seleccionarNivel(6)">6️⃣</button>
-        </div>
-    </div>
-
     <!-- Panel de Supervivencia (🛡️, 🔼, 🔽) -->
     <div id="panelDefensa" class="alert alert-warning py-2 mb-2 shadow-sm d-none">
         <span class="fw-bold small d-block mb-1">⚠️ ¡BOMBA EN TU NIVEL! Usa un comodín (10s):</span>
@@ -83,7 +70,7 @@
         </div>
     </div>
 
-    <!-- TABLERO DE LOS 6 NIVELES (ROJO vs AZUL) -->
+    <!-- TABLERO DINÁMICO DE NIVELES (ROJO vs AZUL) -->
     <div class="row g-2 mb-3">
         <!-- Lado Izquierdo (Rojo) -->
         <div class="col-6">
@@ -107,14 +94,12 @@
             📋 Lista de Participantes Confirmados
         </span>
         <div class="row g-2">
-            <!-- Columna Equipo Rojo -->
             <div class="col-6">
                 <div class="border rounded p-2 bg-white" style="min-height: 90px;">
                     <span class="text-danger fw-bold small d-block border-bottom pb-1 mb-2">🔴 Equipo Rojo</span>
                     <ul id="listaParticipantesIzq" class="list-unstyled m-0 small"></ul>
                 </div>
             </div>
-            <!-- Columna Equipo Azul -->
             <div class="col-6">
                 <div class="border rounded p-2 bg-white" style="min-height: 90px;">
                     <span class="text-primary fw-bold small d-block border-bottom pb-1 mb-2">🔵 Equipo Azul</span>
@@ -124,6 +109,18 @@
         </div>
     </div>
 </div>
+
+<style>
+    .celda-interactiva {
+        cursor: pointer;
+        transition: transform 0.1s ease, border-color 0.1s ease;
+    }
+    .celda-interactiva:hover {
+        transform: scale(1.02);
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 6px rgba(13, 110, 253, 0.3) !important;
+    }
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -161,7 +158,7 @@
 
     let timerInterval = null;
     let tiempoRestante = 15;
-    let accionSelectorModo = "";
+    let faseActual = ""; // "posicion", "ataque", "defensa", "fin"
     let comodinElegidoRonda = null;
 
     function desbloquearAudio() {
@@ -195,6 +192,13 @@
                 audio.play().catch(() => {});
             }
         }
+    }
+
+    // Cantidad total de celdas por lado = (3 * n) / 2
+    function obtenerTotalCeldas() {
+        const n = equipoIzq.length + equipoDer.length;
+        if (n === 0) return 6;
+        return Math.max(3, Math.round((3 * n) / 2));
     }
 
     const canal = client.channel('sala-wargame-niveles');
@@ -257,6 +261,7 @@
 
             document.getElementById('countIzq').innerText = equipoIzq.length;
             document.getElementById('countDer').innerText = equipoDer.length;
+            document.getElementById('lblTotalCeldas').innerText = obtenerTotalCeldas();
 
             renderizarTableros(false);
             renderizarListaParticipantes();
@@ -316,12 +321,15 @@
         pintarLista(equipoDer, ulDer);
     }
 
+    // RENDERIZADO DEL TABLERO DINÁMICO
     function renderizarTableros(revelarAmbos = false) {
-        const dibujarLado = (equipo, colId, bloqueados, bombaEnNivel, bombaApuntada, vacioEnNivel) => {
+        const maxCeldas = obtenerTotalCeldas();
+
+        const dibujarLado = (equipo, colId, bloqueados, bombaEnNivel, bombaApuntada, vacioEnNivel, esMiLado) => {
             const cont = document.getElementById(colId);
             let html = "";
 
-            for (let lvl = 6; lvl >= 1; lvl--) {
+            for (let lvl = maxCeldas; lvl >= 1; lvl--) {
                 const estaBloqueado = bloqueados.has(lvl);
                 const jugadoresEnNivel = equipo.filter(nom => posiciones[nom] === lvl && !eliminados.has(nom));
 
@@ -339,17 +347,34 @@
                     etiquetaJugadores = `<span class="badge bg-warning text-dark fw-bold">💣vacío</span>`;
                 }
 
-                let iconoNivel = `${lvl}️⃣`;
+                let iconoNivel = `[${lvl}]`;
                 if (estaBloqueado) iconoNivel = "❌";
                 if (bombaEnNivel === lvl && vacioEnNivel !== lvl) iconoNivel += " 💣";
                 if (bombaApuntada === lvl) iconoNivel += " 🎯";
 
+                // Interactividad por clic directo en la celda
+                let clasesInteractiva = "";
+                let accionClick = "";
+
+                if (!estoyEliminado && !estaBloqueado) {
+                    // Fase 1: Clic en cualquier celda de su propio lado para posicionarse
+                    if (faseActual === "posicion" && esMiLado) {
+                        clasesInteractiva = "celda-interactiva border-primary";
+                        accionClick = `onclick="clickCelda(${lvl}, 'posicion')"`;
+                    }
+                    // Fase 2: Quien tiene la bomba clica en una celda rival para atacarla
+                    else if (faseActual === "ataque" && !esMiLado && tieneLaBomba() && !yaDisparoBomba) {
+                        clasesInteractiva = "celda-interactiva border-danger";
+                        accionClick = `onclick="clickCelda(${lvl}, 'ataque')"`;
+                    }
+                }
+
                 const bgClass = estaBloqueado ? "bg-secondary-subtle opacity-50" : "bg-white";
 
                 html += `
-                    <div class="card p-1 shadow-sm border text-start ${bgClass}" style="min-height: 40px;">
+                    <div class="card p-1 shadow-sm border text-start ${bgClass} ${clasesInteractiva}" style="min-height: 42px;" ${accionClick}>
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold small">${iconoNivel}</span>
+                            <span class="fw-bold small text-secondary">${iconoNivel}</span>
                             <div class="d-flex flex-wrap gap-1">${etiquetaJugadores}</div>
                         </div>
                     </div>
@@ -358,10 +383,32 @@
             cont.innerHTML = html;
         };
 
-        dibujarLado(equipoIzq, 'tableroIzq', bloqueadosIzq, nivelBombaAsignadaIzq, nivelObjetivoDisparoDer, avisoVacioIzq);
-        dibujarLado(equipoDer, 'tableroDer', bloqueadosDer, nivelBombaAsignadaDer, nivelObjetivoDisparoIzq, avisoVacioDer);
+        const esLadoIzqMio = (miEquipo === 'izq');
+        const esLadoDerMio = (miEquipo === 'der');
+
+        dibujarLado(equipoIzq, 'tableroIzq', bloqueadosIzq, nivelBombaAsignadaIzq, nivelObjetivoDisparoDer, avisoVacioIzq, esLadoIzqMio);
+        dibujarLado(equipoDer, 'tableroDer', bloqueadosDer, nivelBombaAsignadaDer, nivelObjetivoDisparoIzq, avisoVacioDer, esLadoDerMio);
         actualizarBadgesComodines();
         renderizarListaParticipantes();
+    }
+
+    function tieneLaBomba() {
+        return (miEquipo === 'izq' && posiciones[miNombre] === nivelBombaAsignadaIzq) ||
+               (miEquipo === 'der' && posiciones[miNombre] === nivelBombaAsignadaDer);
+    }
+
+    // CLIC DIRECTO SOBRE LA CELDA DEL TABLERO
+    function clickCelda(lvl, tipo) {
+        if (tipo === "posicion" && faseActual === "posicion") {
+            posiciones[miNombre] = lvl;
+            renderizarTableros(false);
+            canal.send({ type: 'broadcast', event: 'posicion_elegida', payload: { jugador: miNombre, nivel: lvl } });
+        } else if (tipo === "ataque" && faseActual === "ataque") {
+            if (yaDisparoBomba) return;
+            yaDisparoBomba = true;
+            canal.send({ type: 'broadcast', event: 'objetivo_disparado', payload: { jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl } });
+            recibirObjetivoDisparado({ jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl });
+        }
     }
 
     function actualizarBadgesComodines() {
@@ -372,7 +419,7 @@
         document.getElementById('badgeBajar').className = c.bajar ? "badge bg-warning text-dark" : "badge bg-secondary opacity-25";
     }
 
-    // FASE 1: POSICIONAMIENTO
+    // FASE 1: POSICIONAMIENTO DINÁMICO (3 * n SEGUNDOS)
     async function iniciarRonda() {
         if (!partidaEnCurso) {
             await client.from('estado_wargame').update({ en_curso: true }).eq('id', 1);
@@ -391,6 +438,7 @@
     function recibirFasePosicionamiento(payload) {
         const duracion = payload.duracion || (3 * (equipoIzq.length + equipoDer.length)) || 15;
 
+        faseActual = "posicion";
         nivelBombaAsignadaIzq = null;
         nivelBombaAsignadaDer = null;
         nivelObjetivoDisparoIzq = null;
@@ -403,19 +451,17 @@
 
         document.getElementById('alertaResultado').classList.add('d-none');
         document.getElementById('panelDefensa').classList.add('d-none');
-        document.getElementById('txtFase').innerText = `Fase 1: Escoge tu nivel (${duracion}s)`;
-
-        if (!estoyEliminado) {
-            accionSelectorModo = "posicion";
-            document.getElementById('lblSelectorNivel').innerText = "Selecciona tu posición (puedes cambiar cuantas veces desees):";
-            habilitarSelectorNiveles(miEquipo === 'izq' ? bloqueadosIzq : bloqueadosDer);
-        }
+        document.getElementById('txtFase').innerText = `Fase 1: Haz clic en cualquier celda de tu lado para elegir nivel (${duracion}s)`;
 
         renderizarTableros(false);
         iniciarTemporizador(duracion, () => finalizarFasePosicionamiento());
 
         if (esAdmin && equipoDer.includes("Cerebro")) {
-            const libres = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
+            const maxC = obtenerTotalCeldas();
+            const libres = [];
+            for (let i = 1; i <= maxC; i++) {
+                if (!bloqueadosDer.has(i)) libres.push(i);
+            }
             fetch('/api/cerebro-accion-wargame', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -427,27 +473,14 @@
         }
     }
 
-    function seleccionarNivel(lvl) {
-        if (accionSelectorModo === "posicion") {
-            posiciones[miNombre] = lvl;
-            renderizarTableros(false);
-            canal.send({ type: 'broadcast', event: 'posicion_elegida', payload: { jugador: miNombre, nivel: lvl } });
-        } else if (accionSelectorModo === "ataque") {
-            if (yaDisparoBomba) return;
-            yaDisparoBomba = true;
-            deshabilitarSelectorNiveles();
-            canal.send({ type: 'broadcast', event: 'objetivo_disparado', payload: { jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl } });
-            recibirObjetivoDisparado({ jugador: miNombre, equipo: miEquipo, nivelObjetivo: lvl });
-        }
-    }
-
     function recibirPosicionElegida(data) {
         posiciones[data.jugador] = data.nivel;
         renderizarTableros(false);
     }
 
     function finalizarFasePosicionamiento() {
-        deshabilitarSelectorNiveles();
+        faseActual = "";
+        renderizarTableros(false);
         if (esAdmin) {
             setTimeout(iniciarFaseAtaque, 1000);
         }
@@ -455,8 +488,13 @@
 
     // FASE 2: ATAQUE
     function iniciarFaseAtaque() {
-        const libresIzq = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosIzq.has(n));
-        const libresDer = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
+        const maxC = obtenerTotalCeldas();
+        const libresIzq = [];
+        const libresDer = [];
+        for (let i = 1; i <= maxC; i++) {
+            if (!bloqueadosIzq.has(i)) libresIzq.push(i);
+            if (!bloqueadosDer.has(i)) libresDer.push(i);
+        }
 
         const bombaIzq = libresIzq[Math.floor(Math.random() * libresIzq.length)];
         const bombaDer = libresDer[Math.floor(Math.random() * libresDer.length)];
@@ -470,6 +508,7 @@
     }
 
     function recibirFaseAtaque(data) {
+        faseActual = "ataque";
         nivelBombaAsignadaIzq = data.bombaIzq;
         nivelBombaAsignadaDer = data.bombaDer;
 
@@ -504,19 +543,19 @@
 
         avisoVacioIzq = null;
         avisoVacioDer = null;
-        renderizarTableros(false);
 
-        const tengoBomba = (miEquipo === 'izq' && posiciones[miNombre] === nivelBombaAsignadaIzq) ||
-                           (miEquipo === 'der' && posiciones[miNombre] === nivelBombaAsignadaDer);
-
-        if (tengoBomba && !estoyEliminado) {
-            accionSelectorModo = "ataque";
-            document.getElementById('lblSelectorNivel').innerText = "¡Tienes la bomba 💣! Selecciona a ciegas qué nivel rival atacar:";
-            habilitarSelectorNiveles(miEquipo === 'izq' ? bloqueadosDer : bloqueadosIzq);
+        if (tieneLaBomba() && !estoyEliminado) {
+            document.getElementById('txtFase').innerText = "¡Tienes la bomba 💣! Haz clic en una celda rival para atacarla:";
         }
 
+        renderizarTableros(false);
+
         if (esAdmin && posiciones["Cerebro"] === nivelBombaAsignadaDer && !eliminados.has("Cerebro")) {
-            const libresOpuestos = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosIzq.has(n));
+            const maxC = obtenerTotalCeldas();
+            const libresOpuestos = [];
+            for (let i = 1; i <= maxC; i++) {
+                if (!bloqueadosIzq.has(i)) libresOpuestos.push(i);
+            }
             fetch('/api/cerebro-accion-wargame', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -556,6 +595,7 @@
 
     // FASE 3: SUPERVIVENCIA
     function recibirFaseDefensa(data) {
+        faseActual = "defensa";
         nivelObjetivoDisparoIzq = data.nivelObjetivoDisparoIzq;
         nivelObjetivoDisparoDer = data.nivelObjetivoDisparoDer;
 
@@ -577,7 +617,11 @@
 
         if (esAdmin && !eliminados.has("Cerebro")) {
             if (posiciones["Cerebro"] === nivelObjetivoDisparoIzq) {
-                const libresCerebro = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosDer.has(n));
+                const maxC = obtenerTotalCeldas();
+                const libresCerebro = [];
+                for (let i = 1; i <= maxC; i++) {
+                    if (!bloqueadosDer.has(i)) libresCerebro.push(i);
+                }
                 fetch('/api/cerebro-accion-wargame', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -597,11 +641,15 @@
     }
 
     function evaluarSentenciaInevitable() {
+        const maxC = obtenerTotalCeldas();
         const checkSentencia = (nombre, equipoLado, nivelObjetivo) => {
             if (!nombre || eliminados.has(nombre) || posiciones[nombre] !== nivelObjetivo) return false;
             const com = comodinesJugadores[nombre];
             const blq = (equipoLado === 'izq') ? bloqueadosIzq : bloqueadosDer;
-            const libres = [1, 2, 3, 4, 5, 6].filter(n => !blq.has(n));
+            const libres = [];
+            for (let i = 1; i <= maxC; i++) {
+                if (!blq.has(i)) libres.push(i);
+            }
             const puedeMoverse = libres.length > 1 && (com.subir || com.bajar);
             const puedeBlindar = com.escudo;
             return (!puedeMoverse && !puedeBlindar);
@@ -646,7 +694,11 @@
         const p = document.getElementById('panelDefensa');
         const c = comodinesJugadores[miNombre];
         const bloqueadosPropios = miEquipo === 'izq' ? bloqueadosIzq : bloqueadosDer;
-        const libres = [1, 2, 3, 4, 5, 6].filter(n => !bloqueadosPropios.has(n));
+        const maxC = obtenerTotalCeldas();
+        const libres = [];
+        for (let i = 1; i <= maxC; i++) {
+            if (!bloqueadosPropios.has(i)) libres.push(i);
+        }
         const hayOtrosNiveles = libres.length > 1;
 
         document.getElementById('btnComodinEscudo').disabled = !c.escudo;
@@ -675,7 +727,11 @@
 
         const lvlActual = posiciones[data.jugador];
         const ladoBloqueados = equipoIzq.includes(data.jugador) ? bloqueadosIzq : bloqueadosDer;
-        const libres = [1, 2, 3, 4, 5, 6].filter(n => !ladoBloqueados.has(n));
+        const maxC = obtenerTotalCeldas();
+        const libres = [];
+        for (let i = 1; i <= maxC; i++) {
+            if (!ladoBloqueados.has(i)) libres.push(i);
+        }
 
         if (libres.length > 1) {
             if (data.comodin === 'subir') {
@@ -737,6 +793,7 @@
     }
 
     function recibirResolucionRonda(data) {
+        faseActual = "fin";
         bloqueadosIzq = new Set(data.bloqueadosIzq);
         bloqueadosDer = new Set(data.bloqueadosDer);
         eliminados = new Set(data.eliminados);
@@ -778,8 +835,9 @@
         const vivosIzq = equipoIzq.filter(n => !eliminados.has(n));
         const vivosDer = equipoDer.filter(n => !eliminados.has(n));
 
-        const perdioPorPisosIzq = bloqueadosIzq.size >= 6;
-        const perdioPorPisosDer = bloqueadosDer.size >= 6;
+        const maxC = obtenerTotalCeldas();
+        const perdioPorPisosIzq = bloqueadosIzq.size >= maxC;
+        const perdioPorPisosDer = bloqueadosDer.size >= maxC;
         const sinVivosIzq = vivosIzq.length === 0;
         const sinVivosDer = vivosDer.length === 0;
 
@@ -831,29 +889,13 @@
         }, 1000);
     }
 
-    function habilitarSelectorNiveles(bloqueados) {
-        const p = document.getElementById('panelSelectorNivel');
-        p.classList.remove('opacity-25');
-        p.style.pointerEvents = 'auto';
-
-        for (let lvl = 1; lvl <= 6; lvl++) {
-            const btn = document.getElementById(`btnNvl${lvl}`);
-            if (btn) btn.disabled = bloqueados.has(lvl);
-        }
-    }
-
-    function deshabilitarSelectorNiveles() {
-        const p = document.getElementById('panelSelectorNivel');
-        p.classList.add('opacity-25');
-        p.style.pointerEvents = 'none';
-    }
-
     function resetearEstadoLocal() {
         clearInterval(timerInterval);
         partidaEnCurso = false;
         estoyEliminado = false;
         miNombre = "";
         miEquipo = "";
+        faseActual = "";
         equipoIzq = [];
         equipoDer = [];
         eliminados.clear();
@@ -870,24 +912,14 @@
         if (snd) { snd.pause(); snd.currentTime = 0; }
 
         const b = document.getElementById('btnListo');
-        if (b) {
-            b.disabled = false;
-            b.innerText = "Listo ✅";
-            b.classList.remove('btn-secondary');
-            b.classList.add('btn-success');
-        }
+        if (b) { b.disabled = false; b.innerText = "Listo ✅"; }
         const inp = document.getElementById('inputNombre');
-        if (inp) {
-            inp.disabled = false;
-            inp.value = "";
-            inp.placeholder = "Ej: Cristian";
-        }
+        if (inp) { inp.disabled = false; inp.value = ""; }
 
         document.getElementById('msgConfirmacion').classList.add('d-none');
         document.getElementById('misComodinesContainer').classList.add('d-none');
         document.getElementById('alertaResultado').classList.add('d-none');
         document.getElementById('panelDefensa').classList.add('d-none');
-        deshabilitarSelectorNiveles();
 
         const btnA = document.getElementById('btnAccionAdmin');
         if (btnA) { btnA.disabled = false; btnA.innerText = "🚀 INICIAR PARTIDA"; }
