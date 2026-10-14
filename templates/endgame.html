@@ -6,25 +6,27 @@
     <audio id="sndExplosion" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
     <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
 
-    <!-- Encabezado Estilo Táctico Oscuro -->
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <div style="width: 38px;"></div>
-        <h2 class="fw-bold text-light m-0 fs-4">⚡ Endgame: Guerra Táctica</h2>
-        <span class="badge bg-danger rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
+    <!-- BLOQUE CABECERA Y REGISTRO (Se oculta al iniciar para ocupar toda la pantalla) -->
+    <div id="bloqueCabeceraRegistro">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div style="width: 38px;"></div>
+            <h2 class="fw-bold text-light m-0 fs-4">⚡ Endgame: Guerra Táctica</h2>
+            <span class="badge bg-danger rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
+        </div>
+
+        <!-- Registro de Jugador -->
+        <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
+            <div class="input-group input-group-sm">
+                <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cris admin)" maxlength="30">
+                <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
+            </div>
+            <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
+                ¡Registrado! Esperando inicio de partida por el Administrador.
+            </div>
+        </div>
     </div>
 
-    <!-- Registro de Jugador -->
-    <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
-        <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cristian)" maxlength="30">
-            <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
-        </div>
-        <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
-            ¡Registrado! Esperando inicio de partida por el Administrador.
-        </div>
-    </div>
-
-    <!-- Panel de Administración -->
+    <!-- PANEL DE ADMINISTRACIÓN (Punto de inicio visible para el Admin durante la partida) -->
     <div id="panelAdmin" class="mb-2 d-none">
         <div class="d-flex justify-content-center gap-2">
             <button id="btnIniciarAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarPartida()">
@@ -36,7 +38,7 @@
         </div>
     </div>
 
-    <!-- Barra de Estado y Notificaciones -->
+    <!-- Barra de Estado y Notificaciones (Punto de inicio visible para los Jugadores normales) -->
     <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold mb-2 shadow-sm text-warning">
         <span id="txtEstado">Esperando combatientes...</span>
     </div>
@@ -110,13 +112,13 @@
             <div class="col-12 col-md-6">
                 <div class="border border-danger rounded-3 p-3 bg-dark shadow">
                     <h5 class="fw-bold text-danger border-bottom border-danger pb-2">🔴 Equipo Rojo</h5>
-                    <ul id="victoriaListaRojos" class="list-unstyled m-0 text-start small"></ul>
+                    <ul id="victoriaListaRojos" class="list-unstyled m-0 text-start fs-6"></ul>
                 </div>
             </div>
             <div class="col-12 col-md-6">
                 <div class="border border-primary rounded-3 p-3 bg-dark shadow">
                     <h5 class="fw-bold text-primary border-bottom border-primary pb-2">🔵 Equipo Azul</h5>
-                    <ul id="victoriaListaAzules" class="list-unstyled m-0 text-start small"></ul>
+                    <ul id="victoriaListaAzules" class="list-unstyled m-0 text-start fs-6"></ul>
                 </div>
             </div>
         </div>
@@ -147,7 +149,6 @@
         </div>
 
         <div class="row g-4 justify-content-center align-items-center position-relative my-2" style="max-width: 720px; margin: auto;">
-            <!-- Columna Búnker Rojo -->
             <div class="col-5">
                 <div class="p-2 bg-danger rounded-top fw-bold text-uppercase fs-6">🔴 Trinchera Roja</div>
                 <div class="d-flex flex-column gap-3 p-2 bg-dark rounded-bottom border border-danger">
@@ -162,12 +163,10 @@
                 </div>
             </div>
 
-            <!-- Separador Central -->
             <div class="col-2 text-center">
                 <span class="fs-1 fw-bold text-warning opacity-75">⚔️</span>
             </div>
 
-            <!-- Columna Búnker Azul -->
             <div class="col-5">
                 <div class="p-2 bg-primary rounded-top fw-bold text-uppercase fs-6">🔵 Trinchera Azul</div>
                 <div class="d-flex flex-column gap-3 p-2 bg-dark rounded-bottom border border-primary">
@@ -183,7 +182,6 @@
             </div>
         </div>
 
-        <!-- Tarjeta de Resultados -->
         <div id="arenaTarjetaResultados" class="card p-3 bg-dark border-warning mx-auto mt-3 shadow-lg d-none" style="max-width: 600px;">
             <h5 id="arenaTituloResumen" class="fw-bold text-warning mb-2"></h5>
             <div id="arenaCuerpoResumen" class="small text-light text-start border-top pt-2"></div>
@@ -195,7 +193,7 @@
 <!-- MODALES -->
 <!-- ========================================== -->
 
-<!-- Modal: Permanencia con Bloqueo de Stock Lleno y 0 Balas -->
+<!-- Modal: Permanencia -->
 <div class="modal fade" id="modalPermanencia" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-secondary shadow-lg bg-dark text-light">
@@ -304,6 +302,11 @@
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
+    }
+
+    .texto-caido {
+        color: #ced4da !important;
+        text-shadow: 0 0 2px rgba(0,0,0,0.8);
     }
 
     .screen-shake {
@@ -535,7 +538,7 @@
     }
 
     // ========================================================
-    // RENDERIZADO (ATAÚD ⚰️ PARA CAÍDOS)
+    // RENDERIZADO CON VISIBILIDAD DE ATAÚD ⚰️
     // ========================================================
     function renderizarTodo() {
         renderizarCeldas();
@@ -609,9 +612,9 @@
             ul.innerHTML = lista.map(nom => {
                 const d = jugadoresData[nom] || { vidas: 3, eliminado: false, balas: 0, escudos: 0, bombas: 0 };
                 
-                // Si el jugador fue eliminado: se muestra su nombre completo con ataúd ⚰️
+                // Jugador eliminado: Nombre y emoji claramente legibles
                 if (d.eliminado || d.vidas <= 0) {
-                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">⚰️ ${nom}</li>`;
+                    return `<li class="py-1 border-bottom border-secondary texto-caido"><span class="text-decoration-line-through">⚰️ ${nom}</span></li>`;
                 }
 
                 const esMiMismoEquipo = (miEquipo === colorEquipo);
@@ -829,7 +832,7 @@
     }
 
     // ========================================================
-    // DETONACIÓN DE BOMBAS Y ABSORCIÓN DE ESCUDO
+    // BOMBAS
     // ========================================================
     function recibirBombaPlantada(payload) {
         const key = `${payload.lado}_${payload.celda}`;
@@ -1191,7 +1194,7 @@
         if (!dueloActivo.posAzul) dueloActivo.posAzul = Math.random() < 0.5 ? 1 : 2;
         if (!dueloActivo.dispAzul) dueloActivo.dispAzul = Math.random() < 0.5 ? 1 : 2;
 
-        reproducirSonido('sndDuelo');
+        reproducirSonido('sndExplosion');
 
         ['arenaIconosR1', 'arenaIconosR2', 'arenaIconosA1', 'arenaIconosA2'].forEach(id => {
             document.getElementById(id).innerHTML = "";
@@ -1266,7 +1269,7 @@
     }
 
     // ========================================================
-    // CICLO TÁCTICO DE CEREBRO (AUTONOMÍA IA)
+    // CICLO TÁCTICO DE CEREBRO
     // ========================================================
     function cerebroLanzaReto(rivalNom) {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
@@ -1411,9 +1414,9 @@
                 const d = jugadoresData[nom] || { vidas: 0, eliminado: true };
                 const estaVivo = (!d.eliminado && d.vidas > 0);
                 if (estaVivo) {
-                    return `<li class="py-1 border-bottom border-secondary text-success fw-bold">🗿 ${nom} (Sobreviviente - ❤️ ${d.vidas})</li>`;
+                    return `<li class="py-2 border-bottom border-secondary text-success fw-bold">🗿 ${nom} <span class="badge bg-success ms-1">Sobreviviente (❤️${d.vidas})</span></li>`;
                 } else {
-                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">⚰️ ${nom} (Caído)</li>`;
+                    return `<li class="py-2 border-bottom border-secondary texto-caido"><span class="text-decoration-line-through text-danger-emphasis">⚰️ ${nom}</span> <span class="badge bg-secondary ms-1">Caído</span></li>`;
                 }
             }).join('');
         };
@@ -1465,6 +1468,17 @@
 
     function recibirInicioPartida() {
         partidaEnCurso = true;
+
+        // OCULTA CABECERA Y REGISTRO PARA EXPANDIR EL JUEGO A PANTALLA COMPLETA
+        const bloqueCab = document.getElementById('bloqueCabeceraRegistro');
+        if (bloqueCab) bloqueCab.classList.add('d-none');
+
+        const contenedorPrincipal = document.getElementById('pantallaJuego');
+        if (contenedorPrincipal) {
+            contenedorPrincipal.style.maxWidth = "100%";
+            contenedorPrincipal.classList.add('px-3');
+        }
+
         mostrarAviso("⚔️ ¡Partida en curso! Muévete, cosecha suministros o reta a los rivales.");
         document.getElementById('btnIniciarAdmin').disabled = true;
 
@@ -1504,6 +1518,16 @@
         clearInterval(timerBombasInterval);
         clearInterval(loopTacticoCerebro);
         timerBombasInterval = null;
+
+        // RESTAURAR VISTA ORIGINAL
+        const bloqueCab = document.getElementById('bloqueCabeceraRegistro');
+        if (bloqueCab) bloqueCab.classList.remove('d-none');
+
+        const contenedorPrincipal = document.getElementById('pantallaJuego');
+        if (contenedorPrincipal) {
+            contenedorPrincipal.style.maxWidth = "780px";
+            contenedorPrincipal.classList.remove('px-3');
+        }
 
         document.getElementById('btnListo').disabled = false;
         document.getElementById('inputNombre').disabled = false;
