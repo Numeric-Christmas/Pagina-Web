@@ -325,7 +325,6 @@ def cerebro_accion_endgame():
         vidas_r = retador_data.get("vidas", 3)
         balas_c = cerebro_data.get("balas", 1)
 
-        # Si le queda 1 sola vida y el rival tiene ventaja, suele evitar el duelo
         if vidas_c == 1 and vidas_r > 1:
             acepta = random.random() < 0.25
         elif balas_c >= 1:
@@ -341,7 +340,7 @@ def cerebro_accion_endgame():
         disp = random.choice([1, 2])
         return jsonify({"posicion": pos, "disparo": disp})
 
-    # 3. Decisiones autónomas en el mapa (Turno de Cerebro)
+    # 3. Decisiones autónomas en el mapa
     elif tipo == "cerebro_ciclo_tactico":
         c_data = data.get("cerebro_data", {})
         if not c_data or c_data.get("eliminado") or c_data.get("vidas", 0) <= 0:
@@ -354,47 +353,43 @@ def cerebro_accion_endgame():
         equipo_rojo = data.get("equipoRojo", [])
         total_celdas = data.get("total_celdas", 3)
 
-        # PRIORIDAD 1: DEFENSA
-        # Si hay una bomba en su celda y no hay escudo activo, usa su escudo si tiene
+        # PRIORIDAD 1: DEFENSA CON ESCUDO (Si hay bomba en su celda)
         key_propia = f"azul_{celda_actual}"
         if key_propia in bombas_plantadas and not escudos_activos.get(key_propia):
             if c_data.get("escudos", 0) > 0:
                 return jsonify({"accion": "activar_escudo", "celda": celda_actual})
 
-        # Si Cerebro está en permanencia cosechando, NO puede moverse ni plantar bombas
+        # Si Cerebro está en permanencia cosechando, NO puede moverse, ni retar, ni plantar bombas
         if c_data.get("permanencia"):
             return jsonify({"accion": "ninguna"})
 
-        # PRIORIDAD 2: ATACAR / PLANTAR BOMBA (si tiene bombas y el rival no tiene bomba en esa celda)
+        # PRIORIDAD 2: ATACAR / PLANTAR BOMBA (si tiene bombas)
         if c_data.get("bombas", 0) > 0 and random.random() < 0.40:
             celdas_libres = [lvl for lvl in range(1, total_celdas + 1) if f"rojo_{lvl}" not in bombas_plantadas]
             if celdas_libres:
                 return jsonify({"accion": "plantar_bomba", "celda": random.choice(celdas_libres)})
 
-        # PRIORIDAD 3: RETAR A UN RIVAL (si tiene balas y hay un rival con balas)
-        if c_data.get("balas", 0) > 0 and random.random() < 0.35:
-            rivales_con_bala = [
+        # PRIORIDAD 3: RETAR A UN RIVAL
+        # Regla: Cerebro debe tener al menos 1 bala y el rival al menos 1 bala
+        if c_data.get("balas", 0) >= 1 and random.random() < 0.40:
+            rivales_aptos = [
                 nom for nom in equipo_rojo 
-                if jugadores.get(nom, {}).get("balas", 0) > 0 and not jugadores.get(nom, {}).get("eliminado")
+                if jugadores.get(nom, {}).get("balas", 0) >= 1 
+                and not jugadores.get(nom, {}).get("eliminado")
             ]
-            if rivales_con_bala:
-                # Elige preferentemente al que tenga menos vida
-                rivales_con_bala.sort(key=lambda nom: jugadores.get(nom, {}).get("vidas", 3))
-                return jsonify({"accion": "retar", "rival": rivales_con_bala[0]})
+            if rivales_aptos:
+                rivales_aptos.sort(key=lambda nom: jugadores.get(nom, {}).get("vidas", 3))
+                return jsonify({"accion": "retar", "rival": rivales_aptos[0]})
 
-        # PRIORIDAD 4: COSECHAR (Permanencia si le faltan recursos)
-        if not c_data.get("permanencia"):
-            total_celdas = data.get("total_celdas", 3)
+        # PRIORIDAD 4: COSECHAR (Regla estricta: Si tiene 0 balas, forzado a sacar bala)
+        if not c_data.get("permanencia") and random.random() < 0.60:
             nueva_celda = random.randint(1, total_celdas)
             balas_cerebro = c_data.get("balas", 0)
 
             opciones = []
-
-            # REGLA ESTRICTA: Si tiene 0 balas, OBLIGATORIAMENTE debe cosechar bala
             if balas_cerebro == 0:
                 opciones.append(("bala", 5))
             else:
-                # Si tiene al menos 1 bala, recién puede elegir otros artículos según necesidad
                 if c_data.get("vidas", 3) < 3:
                     opciones.append(("corazon", 15))
                 if c_data.get("escudos", 1) < 2:

@@ -6,20 +6,20 @@
     <audio id="sndExplosion" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
     <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
 
-    <!-- Encabezado -->
+    <!-- Encabezado Estilo Táctico Oscuro -->
     <div class="d-flex justify-content-between align-items-center mb-1">
         <div style="width: 38px;"></div>
-        <h2 class="fw-bold text-dark m-0 fs-4">🏰 Endgame: Guerra Táctica</h2>
-        <span class="badge bg-dark rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
+        <h2 class="fw-bold text-light m-0 fs-4">⚡ Endgame: Guerra Táctica</h2>
+        <span class="badge bg-danger rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
     </div>
-    <p class="text-muted small mb-2" style="font-size: 0.75rem;">
-        Tablero de <span id="lblTotalCeldas" class="fw-bold">3</span> guaridas por bando. Doble clic en compañeros para donar, en rivales para retar.
+    <p class="text-secondary small mb-2" style="font-size: 0.75rem;">
+        Tablero de <span id="lblTotalCeldas" class="fw-bold text-warning">3</span> celdas por bando. Doble clic en compañeros para donar, en rivales para retar.
     </p>
 
-    <!-- Registro -->
-    <div class="card p-2 shadow-sm border rounded-3 mb-2 bg-light">
+    <!-- Registro de Jugador -->
+    <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
         <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control" placeholder="Tu nombre (Ej: Cris admin)" maxlength="30">
+            <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cris admin)" maxlength="30">
             <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
         </div>
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
@@ -33,66 +33,66 @@
             <button id="btnIniciarAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarPartida()">
                 🚀 INICIAR PARTIDA
             </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="reiniciarPartida()">
+            <button class="btn btn-outline-secondary btn-sm text-light" onclick="reiniciarPartida()">
                 🗑️ Reiniciar
             </button>
         </div>
     </div>
 
     <!-- Barra de Estado y Notificaciones -->
-    <div id="panelEstado" class="alert alert-secondary py-1 px-3 small fw-bold mb-2 shadow-sm">
+    <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold mb-2 shadow-sm text-warning">
         <span id="txtEstado">Esperando combatientes...</span>
     </div>
 
-    <!-- Barra de Inventario Personal con Botón de Escudo Interactivo -->
-    <div id="panelMiInventario" class="card p-2 shadow-sm border rounded-3 mb-2 bg-white d-none">
+    <!-- Barra de Inventario Personal con Botón de Escudo -->
+    <div id="panelMiInventario" class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura text-light d-none">
         <div class="d-flex justify-content-around align-items-center small flex-wrap">
             <span class="fw-bold text-muted">Tu Inventario:</span>
-            <span>❤️ <strong id="invVidas">3</strong>/3</span>
-            <span>• <strong id="invBalas">1</strong>/6</span>
+            <span>❤️ <strong id="invVidas" class="text-danger">3</strong>/3</span>
+            <span>• <strong id="invBalas" class="text-warning">1</strong>/6</span>
             
-            <button id="btnUsarEscudo" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" onclick="activarEscudoDefensivo()" title="Haz clic para activar tu escudo en tu celda actual">
+            <button id="btnUsarEscudo" class="btn btn-sm btn-outline-info py-0 px-2 fw-bold" onclick="activarEscudoDefensivo()" title="Haz clic para activar tu escudo en tu celda actual">
                 🛡️ <strong id="invEscudos">1</strong>/2 (Usar)
             </button>
             
-            <span>💣 <strong id="invBombas">0</strong>/4</span>
+            <span>💣 <strong id="invBombas" class="text-danger">0</strong>/4</span>
             <span id="badgePermanencia" class="badge bg-warning text-dark d-none">⏳ Cosechando...</span>
         </div>
     </div>
 
-    <!-- TABLERO DINÁMICO DE GUARIDAS -->
+    <!-- TABLERO DINÁMICO DE CELDAS -->
     <div class="row g-2 mb-3">
         <!-- Lado Izquierdo (Rojo) -->
         <div class="col-6">
-            <div class="p-1 rounded-top bg-danger text-white fw-bold small">🔴 GUARIDAS ROJAS</div>
-            <div id="tableroIzq" class="d-flex flex-column gap-2 p-2 border border-danger rounded-bottom bg-light"></div>
+            <div class="p-1 rounded-top bg-danger text-white fw-bold small">🔴 ROJO</div>
+            <div id="tableroIzq" class="d-flex flex-column gap-2 p-2 border border-danger rounded-bottom bg-columna-oscura"></div>
         </div>
 
         <!-- Lado Derecho (Azul) -->
         <div class="col-6">
-            <div class="p-1 rounded-top bg-primary text-white fw-bold small">🔵 GUARIDAS AZULES</div>
-            <div id="tableroDer" class="d-flex flex-column gap-2 p-2 border border-primary rounded-bottom bg-light"></div>
+            <div class="p-1 rounded-top bg-primary text-white fw-bold small">🔵 AZUL</div>
+            <div id="tableroDer" class="d-flex flex-column gap-2 p-2 border border-primary rounded-bottom bg-columna-oscura"></div>
         </div>
     </div>
 
     <!-- LISTA DE PARTICIPANTES -->
-    <div class="card p-2 shadow-sm border rounded-3 bg-light text-start mb-3">
-        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+    <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
             <span class="fw-bold small text-muted text-uppercase" style="font-size: 0.75rem;">
                 📋 Combatientes (Doble clic: Compañero = Donar 🎁 | Rival = Retar ⚔️)
             </span>
         </div>
         <div class="row g-2">
             <div class="col-6">
-                <div class="border rounded p-2 bg-white" style="min-height: 100px;">
-                    <span class="text-danger fw-bold small d-block border-bottom pb-1 mb-1">🔴 Bando Rojo</span>
-                    <ul id="listaRojos" class="list-unstyled m-0 small no-select"></ul>
+                <div class="border border-secondary rounded p-2 bg-dark" style="min-height: 100px;">
+                    <span class="text-danger fw-bold small d-block border-bottom border-secondary pb-1 mb-1">🔴 Bando Rojo</span>
+                    <ul id="listaRojos" class="list-unstyled m-0 small no-select text-light"></ul>
                 </div>
             </div>
             <div class="col-6">
-                <div class="border rounded p-2 bg-white" style="min-height: 100px;">
-                    <span class="text-primary fw-bold small d-block border-bottom pb-1 mb-1">🔵 Bando Azul</span>
-                    <ul id="listaAzules" class="list-unstyled m-0 small no-select"></ul>
+                <div class="border border-secondary rounded p-2 bg-dark" style="min-height: 100px;">
+                    <span class="text-primary fw-bold small d-block border-bottom border-secondary pb-1 mb-1">🔵 Bando Azul</span>
+                    <ul id="listaAzules" class="list-unstyled m-0 small no-select text-light"></ul>
                 </div>
             </div>
         </div>
@@ -101,13 +101,15 @@
     <div id="alertaResultado" class="alert alert-secondary py-2 small fw-bold d-none shadow-sm mb-3"></div>
 </div>
 
+<!-- ======================================================== -->
 <!-- ARENA CINEMÁTICA A PANTALLA COMPLETA (DUELO 2x2) -->
+<!-- ======================================================== -->
 <div id="arenaCinematica" class="d-none no-select">
     <div class="arena-content text-white text-center">
         <div class="mb-3">
-            <h1 class="display-5 fw-bold text-warning text-uppercase mb-1 animate__animated animate__zoomIn">
+            <h1 class="display-5 fw-bold text-uppercase mb-1 animate__animated animate__zoomIn">
                 <span id="arenaNombreRojo" class="text-danger">ROJO</span>
-                <span class="mx-2 text-white">⚡ VS ⚡</span>
+                <span class="mx-2 text-warning">⚡ VS ⚡</span>
                 <span id="arenaNombreAzul" class="text-primary">AZUL</span>
             </h1>
             <p id="arenaInstruccion" class="lead text-light mb-0" style="font-size: 1rem;">
@@ -161,20 +163,24 @@
     </div>
 </div>
 
-<!-- Modal: Permanencia con Bloqueo de Stock Lleno -->
+<!-- ========================================== -->
+<!-- MODALES -->
+<!-- ========================================== -->
+
+<!-- Modal: Permanencia con Bloqueo de Stock Lleno y 0 Balas -->
 <div class="modal fade" id="modalPermanencia" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-secondary shadow-lg">
-            <div class="modal-header py-2 bg-dark text-white">
-                <h6 class="modal-title small fw-bold">🏰 Permanencia en Guarida</h6>
+        <div class="modal-content border-secondary shadow-lg bg-dark text-light">
+            <div class="modal-header py-2 bg-black border-secondary">
+                <h6 class="modal-title small fw-bold text-warning">⏳ Permanencia</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-2 text-center">
                 <p class="small text-muted mb-2" style="font-size: 0.75rem;">
-                    Elige el artículo que deseas recolectar (solo si tienes espacio en inventario):
+                    Elige el artículo que deseas recolectar:
                 </p>
                 <div class="d-grid gap-2">
-                    <button id="btnPermBala" class="btn btn-outline-dark btn-sm text-start" onclick="activarPermanencia('bala', 5)">
+                    <button id="btnPermBala" class="btn btn-outline-light btn-sm text-start" onclick="activarPermanencia('bala', 5)">
                         • Moldear Bala (5s) <span id="lblStockPermBala" class="badge bg-secondary float-end">+1 Bala</span>
                     </button>
                     <button id="btnPermEscudo" class="btn btn-outline-primary btn-sm text-start" onclick="activarPermanencia('escudo', 10)">
@@ -183,7 +189,7 @@
                     <button id="btnPermCorazon" class="btn btn-outline-danger btn-sm text-start" onclick="activarPermanencia('corazon', 15)">
                         ❤️ Recuperar Corazón (15s) <span id="lblStockPermCorazon" class="badge bg-secondary float-end">+1 Vida</span>
                     </button>
-                    <button id="btnPermBomba" class="btn btn-outline-warning text-dark btn-sm text-start" onclick="activarPermanencia('bomba', 20)">
+                    <button id="btnPermBomba" class="btn btn-outline-warning text-warning btn-sm text-start" onclick="activarPermanencia('bomba', 20)">
                         💣 Armar Bomba (20s) <span id="lblStockPermBomba" class="badge bg-secondary float-end">+1 Bomba</span>
                     </button>
                 </div>
@@ -195,7 +201,7 @@
 <!-- Modal: Donar a Compañero -->
 <div class="modal fade" id="modalDonacion" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-success shadow-lg">
+        <div class="modal-content border-success shadow-lg bg-dark text-light">
             <div class="modal-header py-2 bg-success text-white">
                 <h6 class="modal-title small fw-bold">🎁 Donar a <span id="donarDestinatarioNombre">Compañero</span></h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -205,7 +211,7 @@
                     Transfiere uno de tus suministros a tu compañero:
                 </p>
                 <div class="d-grid gap-2">
-                    <button id="btnDonarBala" class="btn btn-outline-dark btn-sm text-start" onclick="ejecutarDonacion('balas', 6)">
+                    <button id="btnDonarBala" class="btn btn-outline-light btn-sm text-start" onclick="ejecutarDonacion('balas', 6)">
                         • Entregar Bala (Tienes: <span id="stockBala">0</span>)
                     </button>
                     <button id="btnDonarEscudo" class="btn btn-outline-primary btn-sm text-start" onclick="ejecutarDonacion('escudos', 2)">
@@ -214,7 +220,7 @@
                     <button id="btnDonarCorazon" class="btn btn-outline-danger btn-sm text-start" onclick="ejecutarDonacion('vidas', 3)">
                         ❤️ Ceder Corazón (Tienes: <span id="stockCorazon">0</span>)
                     </button>
-                    <button id="btnDonarBomba" class="btn btn-outline-warning text-dark btn-sm text-start" onclick="ejecutarDonacion('bombas', 4)">
+                    <button id="btnDonarBomba" class="btn btn-outline-warning text-warning btn-sm text-start" onclick="ejecutarDonacion('bombas', 4)">
                         💣 Transferir Bomba (Tienes: <span id="stockBomba">0</span>)
                     </button>
                 </div>
@@ -226,14 +232,14 @@
 <!-- Modal: Reto Recibido -->
 <div class="modal fade" id="modalReto" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-danger shadow-lg">
+        <div class="modal-content border-danger shadow-lg bg-dark text-light">
             <div class="modal-header py-1 bg-danger text-white">
                 <h6 class="modal-title small fw-bold">⚔️ ¡DESAFÍO DE DUELO!</h6>
-                <span id="badgeTimerReto" class="badge bg-dark">5s</span>
+                <span id="badgeTimerReto" class="badge bg-dark border border-light">5s</span>
             </div>
             <div class="modal-body p-3 text-center">
                 <p class="small mb-2">
-                    <strong id="retadorNombre" class="text-danger">Jugador</strong> te ha desafiado a un duelo de pistolas 🔫.
+                    <strong id="retadorNombre" class="text-danger fs-5">Jugador</strong> te ha desafiado a un duelo de pistolas 🔫.
                 </p>
                 <p class="text-muted" style="font-size: 0.7rem;">
                     Se usará 1 bala •. Si aceptas, ganas 1 Bomba 💣. Si declinas, el retador se lleva la bomba 💣.
@@ -247,13 +253,31 @@
     </div>
 </div>
 
+<!-- ESTILOS OSCUROS TÁCTICOS -->
 <style>
+    body {
+        background-color: #0b0d13 !important;
+        background: radial-gradient(circle at 50% 20%, #151924 0%, #07090e 100%) !important;
+        color: #e9ecef;
+        min-height: 100vh;
+    }
+
+    .bg-tarjeta-oscura {
+        background-color: #12151f !important;
+        border-color: #272d3d !important;
+    }
+
+    .bg-columna-oscura {
+        background-color: #0f121a !important;
+    }
+
     .no-select {
         user-select: none;
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
     }
+
     .screen-shake {
         animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
     }
@@ -263,30 +287,33 @@
         30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
         40%, 60% { transform: translate3d(6px, 0, 0); }
     }
-    .guarida-bunker {
+
+    .celda-bunker {
         position: relative;
         cursor: pointer;
-        border: 2px solid #dee2e6;
+        border: 2px solid #232a3b;
         border-radius: 8px;
-        transition: transform 0.15s ease, box-shadow 0.2s ease;
-        background: #ffffff;
+        transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        background: #141824;
+        color: #f8f9fa;
     }
-    .guarida-bunker:hover {
+    .celda-bunker:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        border-color: #495057;
     }
-    .guarida-con-bomba {
+    .celda-con-bomba {
         border-color: #dc3545 !important;
         animation: pulsoBomba 0.6s infinite alternate;
     }
     @keyframes pulsoBomba {
-        from { background-color: #fff; }
-        to { background-color: #ffe0e0; }
+        from { background-color: #141824; }
+        to { background-color: #3b1418; }
     }
-    .guarida-escudada {
+    .celda-escudada {
         border-color: #0d6efd !important;
-        box-shadow: 0 0 10px rgba(13, 110, 253, 0.45) !important;
-        background: #f0f7ff !important;
+        box-shadow: 0 0 12px rgba(13, 110, 253, 0.5) !important;
+        background: #101e38 !important;
     }
     .explosion-overlay {
         position: absolute;
@@ -304,21 +331,23 @@
         40% { transform: translate(-50%, -50%) scale(2.4); opacity: 1; }
         100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
     }
+
+    /* Arena Cinemática */
     #arenaCinematica {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: radial-gradient(circle, rgba(20,20,25,0.98) 0%, rgba(5,5,8,1) 100%);
+        background: radial-gradient(circle, rgba(16,20,30,0.98) 0%, rgba(5,6,10,1) 100%);
         z-index: 99999;
         display: flex;
         justify-content: center;
         align-items: center;
     }
     .celda-arena {
-        background: #212529;
-        border: 2px solid #495057;
+        background: #121622;
+        border: 2px solid #374157;
         border-radius: 6px;
         padding: 16px 12px;
         font-weight: bold;
@@ -331,24 +360,24 @@
     }
     .celda-arena:hover {
         border-color: #ffc107;
-        background: #2b3035;
+        background: #1d2335;
     }
     .celda-pos-elegida {
         border-color: #198754 !important;
-        background: #143522 !important;
+        background: #0f311c !important;
     }
     .celda-disp-elegido {
         border-color: #dc3545 !important;
-        background: #3c1518 !important;
+        background: #3e1217 !important;
     }
     .cursor-pointer {
         cursor: pointer;
     }
     .item-rival:hover {
-        background-color: #ffe5e5 !important;
+        background-color: #3b171a !important;
     }
     .item-companero:hover {
-        background-color: #e8f5e9 !important;
+        background-color: #122b1c !important;
     }
 </style>
 
@@ -478,15 +507,15 @@
     }
 
     // ========================================================
-    // RENDERIZADO
+    // RENDERIZADO (SIN LA PALABRA GUARIDA)
     // ========================================================
     function renderizarTodo() {
-        renderizarGuaridas();
+        renderizarCeldas();
         renderizarListasParticipantes();
         actualizarMiInventarioUI();
     }
 
-    function renderizarGuaridas() {
+    function renderizarCeldas() {
         const maxCeldas = obtenerTotalCeldas();
 
         const pintarLado = (equipoLista, colId, colorLado) => {
@@ -514,7 +543,7 @@
                         if (d.permanencia) {
                             infoPerm = ` <span class="badge bg-warning text-dark">🔒 ${d.permanencia.item} (${d.permanencia.segRestantes}s)</span>`;
                         }
-                        return `<span class="badge bg-dark">${nom}${infoPerm}</span>`;
+                        return `<span class="badge bg-dark border border-secondary">${nom}${infoPerm}</span>`;
                     }).join(' ');
                 }
 
@@ -524,15 +553,15 @@
                 }
 
                 let claseEstilo = "";
-                if (tieneBomba) claseEstilo += " guarida-con-bomba";
-                if (esMiEquipo && tieneEscudoActivo) claseEstilo += " guarida-escudada";
+                if (tieneBomba) claseEstilo += " celda-con-bomba";
+                if (esMiEquipo && tieneEscudoActivo) claseEstilo += " celda-escudada";
 
                 html += `
-                    <div id="guarida_${colorLado}_${lvl}" class="guarida-bunker p-2 shadow-sm ${claseEstilo}" 
-                         onclick="clickSimpleGuarida('${colorLado}', ${lvl})"
-                         ondblclick="clickDobleGuarida('${colorLado}', ${lvl})">
+                    <div id="celda_${colorLado}_${lvl}" class="celda-bunker p-2 shadow-sm ${claseEstilo}" 
+                         onclick="clickSimpleCelda('${colorLado}', ${lvl})"
+                         ondblclick="clickDobleCelda('${colorLado}', ${lvl})">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold small text-secondary">🏰 Guarida [${lvl}]</span>
+                            <span class="fw-bold small text-secondary">[${lvl}]</span>
                             <div class="d-flex gap-1">${badgeEscudoCelda} ${etiquetaBomba}</div>
                         </div>
                         <div class="d-flex flex-wrap gap-1 align-items-center" style="min-height: 24px;">${contenidoInterior}</div>
@@ -552,7 +581,7 @@
             ul.innerHTML = lista.map(nom => {
                 const d = jugadoresData[nom] || { vidas: 3, eliminado: false, balas: 0, escudos: 0, bombas: 0 };
                 if (d.eliminado || d.vidas <= 0) {
-                    return `<li class="py-1 border-bottom text-muted text-decoration-line-through">☠️ ${nom} (Eliminado)</li>`;
+                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">☠️ ${nom} (Eliminado)</li>`;
                 }
 
                 const esMiMismoEquipo = (miEquipo === colorEquipo);
@@ -563,14 +592,14 @@
                     const cursorClase = !esMiPropioUsuario ? "cursor-pointer item-companero" : "";
 
                     return `
-                        <li class="py-1 border-bottom ${cursorClase}" ${accionDblClick} title="${!esMiPropioUsuario ? 'Doble clic para donar suministro 🎁' : ''}">
-                            <strong class="text-dark">${nom}</strong> (❤️${d.vidas} •${d.balas} 🛡️${d.escudos} 💣${d.bombas})
+                        <li class="py-1 border-bottom border-secondary ${cursorClase}" ${accionDblClick} title="${!esMiPropioUsuario ? 'Doble clic para donar suministro 🎁' : ''}">
+                            <strong class="text-light">${nom}</strong> (❤️${d.vidas} •${d.balas} 🛡️${d.escudos} 💣${d.bombas})
                         </li>
                     `;
                 } else {
                     const balasRival = d.balas || 0;
                     return `
-                        <li class="py-1 border-bottom cursor-pointer item-rival text-danger fw-bold" 
+                        <li class="py-1 border-bottom border-secondary cursor-pointer item-rival text-danger fw-bold" 
                             ondblclick="retarJugador('${nom}')" 
                             title="Doble clic para retar a duelo ⚔️ (Tiene: ${balasRival} balas •)">
                             ${nom} ⚔️ (Retar)
@@ -607,9 +636,9 @@
     }
 
     // ========================================================
-    // PERMANENCIA CON VALIDACIÓN DE STOCK LLENO
+    // PERMANENCIA CON VALIDACIÓN DE STOCK Y REGLA DE BALAS
     // ========================================================
-    function clickSimpleGuarida(colorLado, lvl) {
+    function clickSimpleCelda(colorLado, lvl) {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
         if (colorLado !== miEquipo) return;
         const d = jugadoresData[miNombre];
@@ -619,12 +648,12 @@
         sincronizarEstado();
     }
 
-    function clickDobleGuarida(colorLado, lvl) {
+    function clickDobleCelda(colorLado, lvl) {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
         const d = jugadoresData[miNombre];
         if (d.eliminado) return;
 
-        // Si está en permanencia, no puede hacer nada hasta terminar
+        // Si está en permanencia, no puede desplazarse ni plantar bombas
         if (d.permanencia) {
             mostrarAviso("⚠️ No puedes desplazarte ni plantar bombas mientras estés en permanencia.");
             return;
@@ -634,7 +663,6 @@
             d.celda = lvl;
             abrirModalPermanencia();
         } else {
-            // Plantar bomba en guarida rival (validando stock)
             if (d.bombas <= 0) {
                 mostrarAviso("❌ No posees bombas 💣 en tu inventario.");
                 return;
@@ -653,32 +681,26 @@
 
         const tieneBalas = (d.balas >= 1);
 
-        // Validaciones de stock máximo
         const balaLlena = (d.balas >= 6);
         const escudoLleno = (d.escudos >= 2);
         const vidaLlena = (d.vidas >= 3);
         const bombaLlena = (d.bombas >= 4);
 
-        // Botón Bala: solo se deshabilita si ya tiene 6
         document.getElementById('btnPermBala').disabled = balaLlena;
         document.getElementById('lblStockPermBala').innerText = balaLlena ? "Lleno (6/6)" : "+1 Bala";
 
-        // Escudo, Corazón y Bomba: bloqueados si no tiene al menos 1 bala O si tienen stock lleno
         const bloqueoSinBalas = !tieneBalas;
 
-        // Escudo
         document.getElementById('btnPermEscudo').disabled = bloqueoSinBalas || escudoLleno;
         document.getElementById('lblStockPermEscudo').innerText = bloqueoSinBalas 
             ? "🔒 Requiere 1 bala" 
             : (escudoLleno ? "Lleno (2/2)" : "+1 Escudo");
 
-        // Corazón
         document.getElementById('btnPermCorazon').disabled = bloqueoSinBalas || vidaLlena;
         document.getElementById('lblStockPermCorazon').innerText = bloqueoSinBalas 
             ? "🔒 Requiere 1 bala" 
             : (vidaLlena ? "Lleno (3/3)" : "+1 Vida");
 
-        // Bomba
         document.getElementById('btnPermBomba').disabled = bloqueoSinBalas || bombaLlena;
         document.getElementById('lblStockPermBomba').innerText = bloqueoSinBalas 
             ? "🔒 Requiere 1 bala" 
@@ -712,7 +734,7 @@
             }
 
             actualizarMiInventarioUI();
-            renderizarGuaridas();
+            renderizarCeldas();
 
             if (segRestantes <= 0) {
                 clearInterval(timerPermanenciaLocal);
@@ -735,9 +757,8 @@
     }
 
     // ========================================================
-    // ACTIVACIÓN DE ESCUDO MANUAL Y COLECTIVO
+    // ACTIVACIÓN DE ESCUDO MANUAL
     // ========================================================
-// ACTIVACIÓN DE ESCUDO: 100% MANUAL POR EL JUGADOR
     function activarEscudoDefensivo() {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
         const d = jugadoresData[miNombre];
@@ -750,15 +771,14 @@
 
         const celdaKey = `${miEquipo}_${d.celda}`;
         if (escudosActivos[celdaKey]) {
-            mostrarAviso("🛡️ Tu guarida ya cuenta con una cúpula de escudo activa.");
+            mostrarAviso("🛡️ Tu celda ya cuenta con una cúpula de escudo activa.");
             return;
         }
 
-        // Se descuenta obligatoriamente del inventario del jugador
         d.escudos--;
         escudosActivos[celdaKey] = true;
         actualizarMiInventarioUI();
-        renderizarGuaridas();
+        renderizarCeldas();
 
         canal.send({
             type: 'broadcast',
@@ -766,16 +786,16 @@
             payload: { jugador: miNombre, equipo: miEquipo, celda: d.celda }
         });
 
-        mostrarAviso(`🛡️ ¡Desplegaste tu escudo en la Guarida [${d.celda}]! Protege a la celda contra 1 bomba.`);
+        mostrarAviso(`🛡️ ¡Desplegaste tu escudo en [${d.celda}]! Protege la celda contra 1 bomba.`);
         sincronizarEstado();
     }
 
     function recibirEscudoActivado(payload) {
         const celdaKey = `${payload.equipo}_${payload.celda}`;
         escudosActivos[celdaKey] = true;
-        renderizarGuaridas();
+        renderizarCeldas();
         if (payload.equipo === miEquipo) {
-            mostrarAviso(`🛡️ ¡${payload.jugador} activó un escudo colectivo en la Guarida [${payload.celda}]!`);
+            mostrarAviso(`🛡️ ¡${payload.jugador} activó un escudo colectivo en [${payload.celda}]!`);
         }
     }
 
@@ -787,8 +807,8 @@
         if (bombasPlantadas[key]) return;
 
         bombasPlantadas[key] = { seg: 3, lado: payload.lado, celda: payload.celda };
-        renderizarGuaridas();
-        mostrarAviso(`⚠️ ¡Bomba 💣 plantada en Guarida [${payload.celda}] del equipo ${payload.lado.toUpperCase()}! Detona en 3s.`);
+        renderizarCeldas();
+        mostrarAviso(`⚠️ ¡Bomba 💣 plantada en [${payload.celda}] del equipo ${payload.lado.toUpperCase()}! Detona en 3s.`);
         iniciarTimerBombas();
     }
 
@@ -812,17 +832,17 @@
                     ejecutarExplosionAnimada(info.lado, info.celda);
                 }
             });
-            renderizarGuaridas();
+            renderizarCeldas();
         }, 1000);
     }
 
     function ejecutarExplosionAnimada(lado, celda) {
-        const guaridaEl = document.getElementById(`guarida_${lado}_${celda}`);
-        if (guaridaEl) {
+        const celdaEl = document.getElementById(`celda_${lado}_${celda}`);
+        if (celdaEl) {
             const exp = document.createElement('div');
             exp.className = 'explosion-overlay';
             exp.innerText = '💥';
-            guaridaEl.appendChild(exp);
+            celdaEl.appendChild(exp);
             setTimeout(() => exp.remove(), 900);
         }
 
@@ -837,14 +857,14 @@
 
         if (escudosActivos[celdaKey]) {
             delete escudosActivos[celdaKey];
-            mostrarAviso(`🛡️ ¡El escudo activo en la Guarida [${celda}] neutralizó la bomba 💥 y se consumió!`);
+            mostrarAviso(`🛡️ ¡El escudo activo en [${celda}] neutralizó la bomba 💥 y se consumió!`);
         } else {
             if (ocupantes.length > 0) {
                 ocupantes.forEach(nom => {
                     jugadoresData[nom].vidas--;
                     if (jugadoresData[nom].vidas <= 0) jugadoresData[nom].eliminado = true;
                 });
-                mostrarAviso(`💥 ¡Explosión en Guarida [${celda}]! Los ocupantes perdieron 1 ❤️.`);
+                mostrarAviso(`💥 ¡Explosión en [${celda}]! Los ocupantes perdieron 1 ❤️.`);
             }
         }
 
@@ -912,12 +932,18 @@
     }
 
     // ========================================================
-    // RETOS Y ARENA CINEMÁTICA CON CONGELAMIENTO
+    // RETOS Y ARENA CINEMÁTICA
     // ========================================================
     function retarJugador(rival) {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
         const dMio = jugadoresData[miNombre];
         if (dMio.eliminado) return;
+
+        // Regla: No se puede retar si el jugador está en permanencia
+        if (dMio.permanencia) {
+            mostrarAviso("⚠️ No puedes retar a un rival mientras estés cosechando.");
+            return;
+        }
 
         if (dMio.balas <= 0) {
             mostrarAviso("❌ No posees balas • para participar en un duelo.");
@@ -1214,15 +1240,33 @@
     // ========================================================
     // CICLO TÁCTICO DE CEREBRO (AUTONOMÍA IA)
     // ========================================================
+    function cerebroLanzaReto(rivalNom) {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        const cData = jugadoresData["Cerebro"];
+        if (!cData || cData.eliminado || cData.balas <= 0 || cData.permanencia) return;
+
+        const dRival = jugadoresData[rivalNom];
+        if (!dRival || dRival.eliminado || dRival.balas <= 0) return;
+
+        canal.send({
+            type: 'broadcast',
+            event: 'reto_lanzado',
+            payload: { retador: "Cerebro", retado: rivalNom }
+        });
+
+        mostrarAviso(`⚔️ Cerebro ha desafiado a ${rivalNom} a un duelo.`);
+
+        if (miNombre === rivalNom) {
+            recibirRetoLanzado({ retador: "Cerebro", retado: rivalNom });
+        }
+    }
+
     function iniciarCicloCerebro() {
-        // Solo el administrador coordina las peticiones al backend para no duplicar llamadas
         if (!esAdmin) return;
         clearInterval(loopTacticoCerebro);
 
-        // Intervalo realista de 8 a 10 segundos para dar tiempo a jugar a los humanos
         loopTacticoCerebro = setInterval(() => {
             if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
-
             const cData = jugadoresData["Cerebro"];
             if (!cData || cData.eliminado || cData.vidas <= 0) return;
 
@@ -1241,12 +1285,11 @@
             }).then(r => r.json()).then(res => {
                 if (!res || res.accion === "ninguna") return;
 
-                // A. Activar escudo defensivo solo si hay bomba en su celda
                 if (res.accion === "activar_escudo") {
-                    const celdaKey = `azul_${res.celda}`;
-                    if (cData.escudos > 0 && !escudosActivos[celdaKey]) {
+                    const celdaK = `azul_${res.celda}`;
+                    if (cData.escudos > 0 && !escudosActivos[celdaK]) {
                         cData.escudos--;
-                        escudosActivos[celdaKey] = true;
+                        escudosActivos[celdaK] = true;
                         canal.send({
                             type: 'broadcast',
                             event: 'escudo_activado',
@@ -1255,61 +1298,45 @@
                         recibirEscudoActivado({ jugador: "Cerebro", equipo: "azul", celda: res.celda });
                         sincronizarEstado();
                     }
-                }
-
-                // B. Plantar bomba en guarida roja
-                else if (res.accion === "plantar_bomba") {
+                } else if (res.accion === "retar") {
+                    cerebroLanzaReto(res.rival);
+                } else if (res.accion === "plantar_bomba") {
                     if (cData.bombas > 0 && !cData.permanencia) {
                         cData.bombas--;
-                        canal.send({ 
-                            type: 'broadcast', 
-                            event: 'bomba_plantada', 
-                            payload: { lado: 'rojo', celda: res.celda } 
-                        });
+                        canal.send({ type: 'broadcast', event: 'bomba_plantada', payload: { lado: 'rojo', celda: res.celda } });
                         recibirBombaPlantada({ lado: 'rojo', celda: res.celda });
                         sincronizarEstado();
                     }
-                }
-
-                // C. Retar a un rival rojo
-                else if (res.accion === "retar") {
-                    if (!cData.permanencia) {
-                        retarJugador(res.rival);
-                    }
-                }
-
-                // D. Iniciar permanencia para cosechar
-                else if (res.accion === "permanencia") {
+                } else if (res.accion === "permanencia") {
                     cData.celda = res.celda;
                     cData.permanencia = { item: res.item, segRestantes: res.seg };
                     sincronizarEstado();
 
-                    let segC = res.seg;
-                    const timerCerebro = setInterval(() => {
+                    let cSeg = res.seg;
+                    const tCerebro = setInterval(() => {
                         if (operacionesCongeladas) return;
-
-                        segC--;
+                        cSeg--;
                         if (jugadoresData["Cerebro"] && jugadoresData["Cerebro"].permanencia) {
-                            jugadoresData["Cerebro"].permanencia.segRestantes = segC;
+                            jugadoresData["Cerebro"].permanencia.segRestantes = cSeg;
                         }
-                        renderizarGuaridas();
+                        renderizarCeldas();
 
-                        if (segC <= 0) {
-                            clearInterval(timerCerebro);
-                            const yoC = jugadoresData["Cerebro"];
-                            if (yoC) {
-                                if (res.item === 'bala' && yoC.balas < 6) yoC.balas++;
-                                if (res.item === 'escudo' && yoC.escudos < 2) yoC.escudos++;
-                                if (res.item === 'corazon' && yoC.vidas < 3) yoC.vidas++;
-                                if (res.item === 'bomba' && yoC.bombas < 4) yoC.bombas++;
-                                yoC.permanencia = null;
+                        if (cSeg <= 0) {
+                            clearInterval(tCerebro);
+                            const cYo = jugadoresData["Cerebro"];
+                            if (cYo) {
+                                if (res.item === 'bala' && cYo.balas < 6) cYo.balas++;
+                                if (res.item === 'escudo' && cYo.escudos < 2) cYo.escudos++;
+                                if (res.item === 'corazon' && cYo.vidas < 3) cYo.vidas++;
+                                if (res.item === 'bomba' && cYo.bombas < 4) cYo.bombas++;
+                                cYo.permanencia = null;
                             }
                             sincronizarEstado();
                         }
                     }, 1000);
                 }
             }).catch(() => {});
-        }, 9000); // Se evalúa cada 9 segundos, dándole naturalidad de jugador
+        }, 9000);
     }
 
     // ========================================================
@@ -1352,7 +1379,6 @@
         mostrarAviso("⚔️ ¡Partida en curso! Muévete, cosecha suministros o reta a los rivales.");
         document.getElementById('btnIniciarAdmin').disabled = true;
 
-        // Si Cerebro está en el equipo Azul (porque la cantidad de humanos era impar), se activa su IA
         if (equipoAzul.includes("Cerebro")) {
             iniciarCicloCerebro();
         }
