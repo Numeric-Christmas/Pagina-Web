@@ -7,19 +7,16 @@
     <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
 
     <!-- Encabezado Estilo Táctico Oscuro -->
-    <div class="d-flex justify-content-between align-items-center mb-1">
+    <div class="d-flex justify-content-between align-items-center mb-2">
         <div style="width: 38px;"></div>
         <h2 class="fw-bold text-light m-0 fs-4">⚡ Endgame: Guerra Táctica</h2>
         <span class="badge bg-danger rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
     </div>
-    <p class="text-secondary small mb-2" style="font-size: 0.75rem;">
-        Tablero de <span id="lblTotalCeldas" class="fw-bold text-warning">3</span> celdas por bando. Doble clic en compañeros para donar, en rivales para retar.
-    </p>
 
     <!-- Registro de Jugador -->
     <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
         <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cris admin)" maxlength="30">
+            <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cristian)" maxlength="30">
             <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
         </div>
         <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
@@ -78,8 +75,8 @@
     <!-- LISTA DE PARTICIPANTES -->
     <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
-            <span class="fw-bold small text-muted text-uppercase" style="font-size: 0.75rem;">
-                📋 Combatientes (Doble clic: Compañero = Donar 🎁 | Rival = Retar ⚔️)
+            <span class="fw-bold small text-white text-uppercase" style="font-size: 0.8rem;">
+                Combatientes (Donar 🎁 | Retar ⚔️)
             </span>
         </div>
         <div class="row g-2">
@@ -99,6 +96,37 @@
     </div>
 
     <div id="alertaResultado" class="alert alert-secondary py-2 small fw-bold d-none shadow-sm mb-3"></div>
+</div>
+
+<!-- ======================================================== -->
+<!-- PANTALLA COMPLETA CINEMÁTICA DE FIN DE PARTIDA -->
+<!-- ======================================================== -->
+<div id="pantallaVictoriaCinematica" class="d-none no-select">
+    <div class="victoria-content text-white text-center p-3">
+        <h1 id="victoriaTitulo" class="display-4 fw-bold text-uppercase mb-2 animate__animated animate__zoomIn"></h1>
+        <p id="victoriaSubtitulo" class="lead text-light mb-4" style="font-size: 1.1rem;"></p>
+
+        <div class="row g-3 justify-content-center mx-auto" style="max-width: 650px;">
+            <div class="col-12 col-md-6">
+                <div class="border border-danger rounded-3 p-3 bg-dark shadow">
+                    <h5 class="fw-bold text-danger border-bottom border-danger pb-2">🔴 Equipo Rojo</h5>
+                    <ul id="victoriaListaRojos" class="list-unstyled m-0 text-start small"></ul>
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="border border-primary rounded-3 p-3 bg-dark shadow">
+                    <h5 class="fw-bold text-primary border-bottom border-primary pb-2">🔵 Equipo Azul</h5>
+                    <ul id="victoriaListaAzules" class="list-unstyled m-0 text-start small"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-outline-light btn-sm px-4 fw-bold shadow" onclick="cerrarPantallaVictoria()">
+                Cerrar Pantalla ✖
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- ======================================================== -->
@@ -332,8 +360,8 @@
         100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
     }
 
-    /* Arena Cinemática */
-    #arenaCinematica {
+    /* Pantallas Cinemáticas */
+    #arenaCinematica, #pantallaVictoriaCinematica {
         position: fixed;
         top: 0;
         left: 0;
@@ -430,6 +458,7 @@
         .on('broadcast', { event: 'bomba_plantada' }, (p) => recibirBombaPlantada(p.payload))
         .on('broadcast', { event: 'escudo_activado' }, (p) => recibirEscudoActivado(p.payload))
         .on('broadcast', { event: 'donacion_recibida' }, (p) => recibirDonacion(p.payload))
+        .on('broadcast', { event: 'fin_partida' }, (p) => mostrarPantallaVictoria(p.payload))
         .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
 
@@ -476,7 +505,6 @@
                 }
             });
 
-            document.getElementById('lblTotalCeldas').innerText = obtenerTotalCeldas();
             renderizarTodo();
         }
     }
@@ -507,7 +535,7 @@
     }
 
     // ========================================================
-    // RENDERIZADO (SIN LA PALABRA GUARIDA)
+    // RENDERIZADO (ATAÚD ⚰️ PARA CAÍDOS)
     // ========================================================
     function renderizarTodo() {
         renderizarCeldas();
@@ -580,8 +608,10 @@
             const ul = document.getElementById(ulId);
             ul.innerHTML = lista.map(nom => {
                 const d = jugadoresData[nom] || { vidas: 3, eliminado: false, balas: 0, escudos: 0, bombas: 0 };
+                
+                // Si el jugador fue eliminado: se muestra su nombre completo con ataúd ⚰️
                 if (d.eliminado || d.vidas <= 0) {
-                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">☠️ ${nom} (Eliminado)</li>`;
+                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">⚰️ ${nom}</li>`;
                 }
 
                 const esMiMismoEquipo = (miEquipo === colorEquipo);
@@ -636,7 +666,7 @@
     }
 
     // ========================================================
-    // PERMANENCIA CON VALIDACIÓN DE STOCK Y REGLA DE BALAS
+    // PERMANENCIA
     // ========================================================
     function clickSimpleCelda(colorLado, lvl) {
         if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
@@ -653,7 +683,6 @@
         const d = jugadoresData[miNombre];
         if (d.eliminado) return;
 
-        // Si está en permanencia, no puede desplazarse ni plantar bombas
         if (d.permanencia) {
             mostrarAviso("⚠️ No puedes desplazarte ni plantar bombas mientras estés en permanencia.");
             return;
@@ -939,7 +968,6 @@
         const dMio = jugadoresData[miNombre];
         if (dMio.eliminado) return;
 
-        // Regla: No se puede retar si el jugador está en permanencia
         if (dMio.permanencia) {
             mostrarAviso("⚠️ No puedes retar a un rival mientras estés cosechando.");
             return;
@@ -1340,6 +1368,67 @@
     }
 
     // ========================================================
+    // FIN DE PARTIDA Y PANTALLA COMPLETA DE VICTORIA
+    // ========================================================
+    function verificarFinPartida() {
+        const vivosRojos = equipoRojo.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
+        const vivosAzules = equipoAzul.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
+
+        if (vivosRojos.length === 0 || vivosAzules.length === 0) {
+            let ganador = "";
+            let colorClase = "";
+
+            if (vivosRojos.length === 0 && vivosAzules.length === 0) {
+                ganador = "EMPATE TOTAL";
+                colorClase = "text-warning";
+            } else if (vivosRojos.length === 0) {
+                ganador = "VICTORIA DEL BANDO AZUL";
+                colorClase = "text-primary";
+            } else {
+                ganador = "VICTORIA DEL BANDO ROJO";
+                colorClase = "text-danger";
+            }
+
+            const payloadFin = { ganador: ganador, colorClase: colorClase };
+            canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
+            mostrarPantallaVictoria(payloadFin);
+        }
+    }
+
+    function mostrarPantallaVictoria(payload) {
+        partidaEnCurso = false;
+        clearInterval(loopTacticoCerebro);
+
+        const pantalla = document.getElementById('pantallaVictoriaCinematica');
+        const tit = document.getElementById('victoriaTitulo');
+        tit.innerText = payload.ganador;
+        tit.className = `display-4 fw-bold text-uppercase mb-2 animate__animated animate__zoomIn ${payload.colorClase}`;
+        document.getElementById('victoriaSubtitulo').innerText = "La contienda ha terminado. Reporte oficial de combatientes:";
+
+        const pintarEstadoFinal = (lista, ulId) => {
+            const ul = document.getElementById(ulId);
+            ul.innerHTML = lista.map(nom => {
+                const d = jugadoresData[nom] || { vidas: 0, eliminado: true };
+                const estaVivo = (!d.eliminado && d.vidas > 0);
+                if (estaVivo) {
+                    return `<li class="py-1 border-bottom border-secondary text-success fw-bold">🗿 ${nom} (Sobreviviente - ❤️ ${d.vidas})</li>`;
+                } else {
+                    return `<li class="py-1 border-bottom border-secondary text-muted text-decoration-line-through">⚰️ ${nom} (Caído)</li>`;
+                }
+            }).join('');
+        };
+
+        pintarEstadoFinal(equipoRojo, 'victoriaListaRojos');
+        pintarEstadoFinal(equipoAzul, 'victoriaListaAzules');
+
+        pantalla.classList.remove('d-none');
+    }
+
+    function cerrarPantallaVictoria() {
+        document.getElementById('pantallaVictoriaCinematica').classList.add('d-none');
+    }
+
+    // ========================================================
     // SINCRONIZACIÓN Y REINICIO
     // ========================================================
     function sincronizarEstado() {
@@ -1386,29 +1475,6 @@
         renderizarTodo();
     }
 
-    function verificarFinPartida() {
-        const vivosRojos = equipoRojo.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
-        const vivosAzules = equipoAzul.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
-
-        if (vivosRojos.length === 0 || vivosAzules.length === 0) {
-            let ganador = "";
-            if (vivosRojos.length === 0 && vivosAzules.length === 0) {
-                ganador = "🤝 ¡EMPATE TOTAL! Ambas facciones cayeron.";
-            } else if (vivosRojos.length === 0) {
-                ganador = "🔵 ¡EL EQUIPO AZUL HA GANADO LA PARTIDA!";
-            } else {
-                ganador = "🔴 ¡EL EQUIPO ROJO HA GANADO LA PARTIDA!";
-            }
-
-            const el = document.getElementById('alertaResultado');
-            el.className = "alert alert-danger py-2 small fw-bold shadow-sm";
-            el.innerHTML = `🏁 <strong>FIN DEL JUEGO</strong><br>${ganador}`;
-            el.classList.remove('d-none');
-            partidaEnCurso = false;
-            clearInterval(loopTacticoCerebro);
-        }
-    }
-
     function mostrarAviso(txt) {
         document.getElementById('txtEstado').innerHTML = txt;
     }
@@ -1445,6 +1511,7 @@
         document.getElementById('msgConfirmacion').classList.add('d-none');
         document.getElementById('panelMiInventario').classList.add('d-none');
         document.getElementById('arenaCinematica').classList.add('d-none');
+        document.getElementById('pantallaVictoriaCinematica').classList.add('d-none');
         document.getElementById('alertaResultado').classList.add('d-none');
         document.getElementById('btnIniciarAdmin').disabled = false;
         document.getElementById('txtEstado').innerText = "Esperando combatientes...";
