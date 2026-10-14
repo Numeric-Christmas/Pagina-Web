@@ -1,0 +1,1431 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div id="pantallaJuego" class="container py-2 text-center no-select" style="max-width: 780px;">
+    <!-- Audios Opcionales -->
+    <audio id="sndExplosion" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
+    <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <div style="width: 38px;"></div>
+        <h2 class="fw-bold text-dark m-0 fs-4">🏰 Endgame: Guerra Táctica</h2>
+        <span class="badge bg-dark rounded-pill px-3 py-2 fs-6">🔴 vs 🔵</span>
+    </div>
+    <p class="text-muted small mb-2" style="font-size: 0.75rem;">
+        Tablero de <span id="lblTotalCeldas" class="fw-bold">3</span> guaridas por bando. Doble clic en compañeros para donar, en rivales para retar.
+    </p>
+
+    <!-- Registro -->
+    <div class="card p-2 shadow-sm border rounded-3 mb-2 bg-light">
+        <div class="input-group input-group-sm">
+            <input type="text" id="inputNombre" class="form-control" placeholder="Tu nombre (Ej: Cris admin)" maxlength="30">
+            <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
+        </div>
+        <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
+            ¡Registrado! Esperando inicio de partida por el Administrador.
+        </div>
+    </div>
+
+    <!-- Panel de Administración -->
+    <div id="panelAdmin" class="mb-2 d-none">
+        <div class="d-flex justify-content-center gap-2">
+            <button id="btnIniciarAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarPartida()">
+                🚀 INICIAR PARTIDA
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="reiniciarPartida()">
+                🗑️ Reiniciar
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de Estado y Notificaciones -->
+    <div id="panelEstado" class="alert alert-secondary py-1 px-3 small fw-bold mb-2 shadow-sm">
+        <span id="txtEstado">Esperando combatientes...</span>
+    </div>
+
+    <!-- Barra de Inventario Personal con Botón de Escudo Interactivo -->
+    <div id="panelMiInventario" class="card p-2 shadow-sm border rounded-3 mb-2 bg-white d-none">
+        <div class="d-flex justify-content-around align-items-center small flex-wrap">
+            <span class="fw-bold text-muted">Tu Inventario:</span>
+            <span>❤️ <strong id="invVidas">3</strong>/3</span>
+            <span>• <strong id="invBalas">1</strong>/6</span>
+            
+            <button id="btnUsarEscudo" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" onclick="activarEscudoDefensivo()" title="Haz clic para activar tu escudo en tu celda actual">
+                🛡️ <strong id="invEscudos">1</strong>/2 (Usar)
+            </button>
+            
+            <span>💣 <strong id="invBombas">0</strong>/4</span>
+            <span id="badgePermanencia" class="badge bg-warning text-dark d-none">⏳ Cosechando...</span>
+        </div>
+    </div>
+
+    <!-- TABLERO DINÁMICO DE GUARIDAS -->
+    <div class="row g-2 mb-3">
+        <!-- Lado Izquierdo (Rojo) -->
+        <div class="col-6">
+            <div class="p-1 rounded-top bg-danger text-white fw-bold small">🔴 GUARIDAS ROJAS</div>
+            <div id="tableroIzq" class="d-flex flex-column gap-2 p-2 border border-danger rounded-bottom bg-light"></div>
+        </div>
+
+        <!-- Lado Derecho (Azul) -->
+        <div class="col-6">
+            <div class="p-1 rounded-top bg-primary text-white fw-bold small">🔵 GUARIDAS AZULES</div>
+            <div id="tableroDer" class="d-flex flex-column gap-2 p-2 border border-primary rounded-bottom bg-light"></div>
+        </div>
+    </div>
+
+    <!-- LISTA DE PARTICIPANTES -->
+    <div class="card p-2 shadow-sm border rounded-3 bg-light text-start mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-1">
+            <span class="fw-bold small text-muted text-uppercase" style="font-size: 0.75rem;">
+                📋 Combatientes (Doble clic: Compañero = Donar 🎁 | Rival = Retar ⚔️)
+            </span>
+        </div>
+        <div class="row g-2">
+            <div class="col-6">
+                <div class="border rounded p-2 bg-white" style="min-height: 100px;">
+                    <span class="text-danger fw-bold small d-block border-bottom pb-1 mb-1">🔴 Bando Rojo</span>
+                    <ul id="listaRojos" class="list-unstyled m-0 small no-select"></ul>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="border rounded p-2 bg-white" style="min-height: 100px;">
+                    <span class="text-primary fw-bold small d-block border-bottom pb-1 mb-1">🔵 Bando Azul</span>
+                    <ul id="listaAzules" class="list-unstyled m-0 small no-select"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertaResultado" class="alert alert-secondary py-2 small fw-bold d-none shadow-sm mb-3"></div>
+</div>
+
+<!-- ARENA CINEMÁTICA A PANTALLA COMPLETA (DUELO 2x2) -->
+<div id="arenaCinematica" class="d-none no-select">
+    <div class="arena-content text-white text-center">
+        <div class="mb-3">
+            <h1 class="display-5 fw-bold text-warning text-uppercase mb-1 animate__animated animate__zoomIn">
+                <span id="arenaNombreRojo" class="text-danger">ROJO</span>
+                <span class="mx-2 text-white">⚡ VS ⚡</span>
+                <span id="arenaNombreAzul" class="text-primary">AZUL</span>
+            </h1>
+            <p id="arenaInstruccion" class="lead text-light mb-0" style="font-size: 1rem;">
+                Elige tu posición de cobertura y hacia qué trinchera enemiga disparas con tu <strong>pistola 🔫</strong> (Consume 1 bala •)
+            </p>
+            <span id="arenaTimerBadge" class="badge bg-danger fs-5 px-3 py-1 mt-2">5s</span>
+        </div>
+
+        <div class="row g-4 justify-content-center align-items-center position-relative my-2" style="max-width: 720px; margin: auto;">
+            <!-- Columna Búnker Rojo -->
+            <div class="col-5">
+                <div class="p-2 bg-danger rounded-top fw-bold text-uppercase fs-6">🔴 Trinchera Roja</div>
+                <div class="d-flex flex-column gap-3 p-2 bg-dark rounded-bottom border border-danger">
+                    <div id="arenaRojoFila1" class="celda-arena" onclick="clickArena('rojo', 1)">
+                        <span class="celda-arena-label">Fila 1</span>
+                        <div class="arena-iconos" id="arenaIconosR1"></div>
+                    </div>
+                    <div id="arenaRojoFila2" class="celda-arena" onclick="clickArena('rojo', 2)">
+                        <span class="celda-arena-label">Fila 2</span>
+                        <div class="arena-iconos" id="arenaIconosR2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Separador Central -->
+            <div class="col-2 text-center">
+                <span class="fs-1 fw-bold text-warning opacity-75">⚔️</span>
+            </div>
+
+            <!-- Columna Búnker Azul -->
+            <div class="col-5">
+                <div class="p-2 bg-primary rounded-top fw-bold text-uppercase fs-6">🔵 Trinchera Azul</div>
+                <div class="d-flex flex-column gap-3 p-2 bg-dark rounded-bottom border border-primary">
+                    <div id="arenaAzulFila1" class="celda-arena" onclick="clickArena('azul', 1)">
+                        <span class="celda-arena-label">Fila 1</span>
+                        <div class="arena-iconos" id="arenaIconosA1"></div>
+                    </div>
+                    <div id="arenaAzulFila2" class="celda-arena" onclick="clickArena('azul', 2)">
+                        <span class="celda-arena-label">Fila 2</span>
+                        <div class="arena-iconos" id="arenaIconosA2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta de Resultados -->
+        <div id="arenaTarjetaResultados" class="card p-3 bg-dark border-warning mx-auto mt-3 shadow-lg d-none" style="max-width: 600px;">
+            <h5 id="arenaTituloResumen" class="fw-bold text-warning mb-2"></h5>
+            <div id="arenaCuerpoResumen" class="small text-light text-start border-top pt-2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Permanencia con Bloqueo de Stock Lleno -->
+<div class="modal fade" id="modalPermanencia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-secondary shadow-lg">
+            <div class="modal-header py-2 bg-dark text-white">
+                <h6 class="modal-title small fw-bold">🏰 Permanencia en Guarida</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2 text-center">
+                <p class="small text-muted mb-2" style="font-size: 0.75rem;">
+                    Elige el artículo que deseas recolectar (solo si tienes espacio en inventario):
+                </p>
+                <div class="d-grid gap-2">
+                    <button id="btnPermBala" class="btn btn-outline-dark btn-sm text-start" onclick="activarPermanencia('bala', 5)">
+                        • Moldear Bala (5s) <span id="lblStockPermBala" class="badge bg-secondary float-end">+1 Bala</span>
+                    </button>
+                    <button id="btnPermEscudo" class="btn btn-outline-primary btn-sm text-start" onclick="activarPermanencia('escudo', 10)">
+                        🛡️ Reforzar Escudo (10s) <span id="lblStockPermEscudo" class="badge bg-secondary float-end">+1 Escudo</span>
+                    </button>
+                    <button id="btnPermCorazon" class="btn btn-outline-danger btn-sm text-start" onclick="activarPermanencia('corazon', 15)">
+                        ❤️ Recuperar Corazón (15s) <span id="lblStockPermCorazon" class="badge bg-secondary float-end">+1 Vida</span>
+                    </button>
+                    <button id="btnPermBomba" class="btn btn-outline-warning text-dark btn-sm text-start" onclick="activarPermanencia('bomba', 20)">
+                        💣 Armar Bomba (20s) <span id="lblStockPermBomba" class="badge bg-secondary float-end">+1 Bomba</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Donar a Compañero -->
+<div class="modal fade" id="modalDonacion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-success shadow-lg">
+            <div class="modal-header py-2 bg-success text-white">
+                <h6 class="modal-title small fw-bold">🎁 Donar a <span id="donarDestinatarioNombre">Compañero</span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2 text-center">
+                <p class="small text-muted mb-2" style="font-size: 0.75rem;">
+                    Transfiere uno de tus suministros a tu compañero:
+                </p>
+                <div class="d-grid gap-2">
+                    <button id="btnDonarBala" class="btn btn-outline-dark btn-sm text-start" onclick="ejecutarDonacion('balas', 6)">
+                        • Entregar Bala (Tienes: <span id="stockBala">0</span>)
+                    </button>
+                    <button id="btnDonarEscudo" class="btn btn-outline-primary btn-sm text-start" onclick="ejecutarDonacion('escudos', 2)">
+                        🛡️ Entregar Escudo (Tienes: <span id="stockEscudo">0</span>)
+                    </button>
+                    <button id="btnDonarCorazon" class="btn btn-outline-danger btn-sm text-start" onclick="ejecutarDonacion('vidas', 3)">
+                        ❤️ Ceder Corazón (Tienes: <span id="stockCorazon">0</span>)
+                    </button>
+                    <button id="btnDonarBomba" class="btn btn-outline-warning text-dark btn-sm text-start" onclick="ejecutarDonacion('bombas', 4)">
+                        💣 Transferir Bomba (Tienes: <span id="stockBomba">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Reto Recibido -->
+<div class="modal fade" id="modalReto" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-danger shadow-lg">
+            <div class="modal-header py-1 bg-danger text-white">
+                <h6 class="modal-title small fw-bold">⚔️ ¡DESAFÍO DE DUELO!</h6>
+                <span id="badgeTimerReto" class="badge bg-dark">5s</span>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <p class="small mb-2">
+                    <strong id="retadorNombre" class="text-danger">Jugador</strong> te ha desafiado a un duelo de pistolas 🔫.
+                </p>
+                <p class="text-muted" style="font-size: 0.7rem;">
+                    Se usará 1 bala •. Si aceptas, ganas 1 Bomba 💣. Si declinas, el retador se lleva la bomba 💣.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-success btn-sm px-3 fw-bold" onclick="responderReto(true)">Aceptar ⚔️</button>
+                    <button class="btn btn-secondary btn-sm px-3" onclick="responderReto(false)">Rechazar ❌</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .no-select {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+    }
+    .screen-shake {
+        animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    @keyframes shake {
+        10%, 90% { transform: translate3d(-3px, 0, 0); }
+        20%, 80% { transform: translate3d(5px, 0, 0); }
+        30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+        40%, 60% { transform: translate3d(6px, 0, 0); }
+    }
+    .guarida-bunker {
+        position: relative;
+        cursor: pointer;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+        background: #ffffff;
+    }
+    .guarida-bunker:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .guarida-con-bomba {
+        border-color: #dc3545 !important;
+        animation: pulsoBomba 0.6s infinite alternate;
+    }
+    @keyframes pulsoBomba {
+        from { background-color: #fff; }
+        to { background-color: #ffe0e0; }
+    }
+    .guarida-escudada {
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 10px rgba(13, 110, 253, 0.45) !important;
+        background: #f0f7ff !important;
+    }
+    .explosion-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.6);
+        font-size: 3.5rem;
+        opacity: 0;
+        z-index: 20;
+        pointer-events: none;
+        animation: animEstallido 0.8s ease-out forwards;
+    }
+    @keyframes animEstallido {
+        0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+        40% { transform: translate(-50%, -50%) scale(2.4); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
+    }
+    #arenaCinematica {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle, rgba(20,20,25,0.98) 0%, rgba(5,5,8,1) 100%);
+        z-index: 99999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .celda-arena {
+        background: #212529;
+        border: 2px solid #495057;
+        border-radius: 6px;
+        padding: 16px 12px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-height: 70px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .celda-arena:hover {
+        border-color: #ffc107;
+        background: #2b3035;
+    }
+    .celda-pos-elegida {
+        border-color: #198754 !important;
+        background: #143522 !important;
+    }
+    .celda-disp-elegido {
+        border-color: #dc3545 !important;
+        background: #3c1518 !important;
+    }
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .item-rival:hover {
+        background-color: #ffe5e5 !important;
+    }
+    .item-companero:hover {
+        background-color: #e8f5e9 !important;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://atvybxjsolqmadzojkfm.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0dnlieGpzb2xxbWFkem9qa2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MDg3NTgsImV4cCI6MjEwNDM4NDc1OH0.ks66J_l5S8DQ9FHxpc4e0INNDzCRlUyDb-vnH_l4WvM";
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let miNombre = "";
+    let miEquipo = "";
+    let esAdmin = false;
+    let partidaEnCurso = false;
+
+    let equipoRojo = [];
+    let equipoAzul = [];
+    let jugadoresData = {};
+    let bombasPlantadas = {}; 
+    let escudosActivos = {};   
+
+    let dueloActivo = null;
+    let operacionesCongeladas = false;
+
+    let timerRetoInterval = null;
+    let timerArenaInterval = null;
+    let timerPermanenciaLocal = null;
+    let timerBombasInterval = null;
+    let loopTacticoCerebro = null;
+
+    let companeroSeleccionadoParaDonar = "";
+
+    function reproducirSonido(id) {
+        const audio = document.getElementById(id);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+        }
+    }
+
+    const canal = client.channel('sala-endgame-live');
+
+    canal
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_wargame' }, () => cargarParticipantes())
+        .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
+        .on('broadcast', { event: 'iniciar_partida' }, () => recibirInicioPartida())
+        .on('broadcast', { event: 'actualizar_estado_global' }, (p) => recibirEstadoGlobal(p.payload))
+        .on('broadcast', { event: 'reto_lanzado' }, (p) => recibirRetoLanzado(p.payload))
+        .on('broadcast', { event: 'reto_respuesta' }, (p) => recibirRespuestaReto(p.payload))
+        .on('broadcast', { event: 'duelo_eleccion' }, (p) => recibirEleccionDuelo(p.payload))
+        .on('broadcast', { event: 'bomba_plantada' }, (p) => recibirBombaPlantada(p.payload))
+        .on('broadcast', { event: 'escudo_activado' }, (p) => recibirEscudoActivado(p.payload))
+        .on('broadcast', { event: 'donacion_recibida' }, (p) => recibirDonacion(p.payload))
+        .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
+        .subscribe();
+
+    function obtenerTotalCeldas() {
+        const n = equipoRojo.length + equipoAzul.length;
+        if (n === 0) return 3;
+        return Math.max(3, Math.round((3 * n) / 2));
+    }
+
+    async function cargarParticipantes() {
+        const { data, error } = await client
+            .from('participantes_wargame')
+            .select('nombre, id')
+            .order('id', { ascending: true });
+
+        if (!error && data) {
+            equipoRojo = [];
+            equipoAzul = [];
+
+            data.forEach((p, idx) => {
+                if (idx % 2 === 0) equipoRojo.push(p.nombre);
+                else equipoAzul.push(p.nombre);
+            });
+
+            if (data.length > 0 && data.length % 2 !== 0) {
+                equipoAzul.push("Cerebro");
+            }
+
+            if (miNombre) {
+                miEquipo = equipoRojo.includes(miNombre) ? 'rojo' : 'azul';
+            }
+
+            [...equipoRojo, ...equipoAzul].forEach(nom => {
+                if (!jugadoresData[nom]) {
+                    jugadoresData[nom] = {
+                        vidas: 3,
+                        balas: 1,
+                        escudos: 1,
+                        bombas: 0,
+                        celda: 1,
+                        permanencia: null,
+                        eliminado: false
+                    };
+                }
+            });
+
+            document.getElementById('lblTotalCeldas').innerText = obtenerTotalCeldas();
+            renderizarTodo();
+        }
+    }
+
+    async function unirse() {
+        if (partidaEnCurso) return;
+        const input = document.getElementById('inputNombre');
+        const txt = input.value.trim();
+        if (!txt) return;
+
+        esAdmin = txt.toLowerCase().includes('admin');
+        const palabras = txt.split(/\s+/);
+        let nom = (palabras[0].toLowerCase() === 'admin' && palabras.length > 1) ? palabras[1] : palabras[0];
+        nom = nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase();
+        miNombre = nom;
+
+        const { error } = await client.from('participantes_wargame').insert([{ nombre: miNombre, equipo: 'temp' }]);
+        if (!error) {
+            document.getElementById('btnListo').disabled = true;
+            document.getElementById('inputNombre').disabled = true;
+            document.getElementById('msgConfirmacion').classList.remove('d-none');
+            document.getElementById('panelMiInventario').classList.remove('d-none');
+            if (esAdmin) document.getElementById('panelAdmin').classList.remove('d-none');
+
+            await cargarParticipantes();
+            canal.send({ type: 'broadcast', event: 'nuevo_participante', payload: {} });
+        }
+    }
+
+    // ========================================================
+    // RENDERIZADO
+    // ========================================================
+    function renderizarTodo() {
+        renderizarGuaridas();
+        renderizarListasParticipantes();
+        actualizarMiInventarioUI();
+    }
+
+    function renderizarGuaridas() {
+        const maxCeldas = obtenerTotalCeldas();
+
+        const pintarLado = (equipoLista, colId, colorLado) => {
+            const cont = document.getElementById(colId);
+            let html = "";
+            const esMiEquipo = (miEquipo === colorLado);
+
+            for (let lvl = maxCeldas; lvl >= 1; lvl--) {
+                const ocupantes = equipoLista.filter(nom => jugadoresData[nom]?.celda === lvl && !jugadoresData[nom]?.eliminado);
+                const celdaKey = `${colorLado}_${lvl}`;
+                const tieneBomba = !!bombasPlantadas[celdaKey];
+                const tieneEscudoActivo = !!escudosActivos[celdaKey];
+
+                let contenidoInterior = "";
+                let badgeEscudoCelda = "";
+
+                if (esMiEquipo) {
+                    if (tieneEscudoActivo) {
+                        badgeEscudoCelda = `<span class="badge bg-primary text-white border border-light">🛡️ ESCUDO ACTIVO</span>`;
+                    }
+
+                    contenidoInterior = ocupantes.map(nom => {
+                        const d = jugadoresData[nom];
+                        let infoPerm = "";
+                        if (d.permanencia) {
+                            infoPerm = ` <span class="badge bg-warning text-dark">🔒 ${d.permanencia.item} (${d.permanencia.segRestantes}s)</span>`;
+                        }
+                        return `<span class="badge bg-dark">${nom}${infoPerm}</span>`;
+                    }).join(' ');
+                }
+
+                let etiquetaBomba = "";
+                if (tieneBomba) {
+                    etiquetaBomba = `<span class="badge bg-danger animate__animated animate__pulse animate__infinite">💣 DETONACIÓN EN ${bombasPlantadas[celdaKey].seg}s</span>`;
+                }
+
+                let claseEstilo = "";
+                if (tieneBomba) claseEstilo += " guarida-con-bomba";
+                if (esMiEquipo && tieneEscudoActivo) claseEstilo += " guarida-escudada";
+
+                html += `
+                    <div id="guarida_${colorLado}_${lvl}" class="guarida-bunker p-2 shadow-sm ${claseEstilo}" 
+                         onclick="clickSimpleGuarida('${colorLado}', ${lvl})"
+                         ondblclick="clickDobleGuarida('${colorLado}', ${lvl})">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold small text-secondary">🏰 Guarida [${lvl}]</span>
+                            <div class="d-flex gap-1">${badgeEscudoCelda} ${etiquetaBomba}</div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 align-items-center" style="min-height: 24px;">${contenidoInterior}</div>
+                    </div>
+                `;
+            }
+            cont.innerHTML = html;
+        };
+
+        pintarLado(equipoRojo, 'tableroIzq', 'rojo');
+        pintarLado(equipoAzul, 'tableroDer', 'azul');
+    }
+
+    function renderizarListasParticipantes() {
+        const pintarLista = (lista, ulId, colorEquipo) => {
+            const ul = document.getElementById(ulId);
+            ul.innerHTML = lista.map(nom => {
+                const d = jugadoresData[nom] || { vidas: 3, eliminado: false, balas: 0, escudos: 0, bombas: 0 };
+                if (d.eliminado || d.vidas <= 0) {
+                    return `<li class="py-1 border-bottom text-muted text-decoration-line-through">☠️ ${nom} (Eliminado)</li>`;
+                }
+
+                const esMiMismoEquipo = (miEquipo === colorEquipo);
+
+                if (esMiMismoEquipo) {
+                    const esMiPropioUsuario = (nom === miNombre);
+                    const accionDblClick = !esMiPropioUsuario ? `ondblclick="abrirModalDonar('${nom}')"` : "";
+                    const cursorClase = !esMiPropioUsuario ? "cursor-pointer item-companero" : "";
+
+                    return `
+                        <li class="py-1 border-bottom ${cursorClase}" ${accionDblClick} title="${!esMiPropioUsuario ? 'Doble clic para donar suministro 🎁' : ''}">
+                            <strong class="text-dark">${nom}</strong> (❤️${d.vidas} •${d.balas} 🛡️${d.escudos} 💣${d.bombas})
+                        </li>
+                    `;
+                } else {
+                    const balasRival = d.balas || 0;
+                    return `
+                        <li class="py-1 border-bottom cursor-pointer item-rival text-danger fw-bold" 
+                            ondblclick="retarJugador('${nom}')" 
+                            title="Doble clic para retar a duelo ⚔️ (Tiene: ${balasRival} balas •)">
+                            ${nom} ⚔️ (Retar)
+                        </li>
+                    `;
+                }
+            }).join('');
+        };
+
+        pintarLista(equipoRojo, 'listaRojos', 'rojo');
+        pintarLista(equipoAzul, 'listaAzules', 'azul');
+    }
+
+    function actualizarMiInventarioUI() {
+        if (!miNombre || !jugadoresData[miNombre]) return;
+        const d = jugadoresData[miNombre];
+        document.getElementById('invVidas').innerText = d.vidas;
+        document.getElementById('invBalas').innerText = d.balas;
+        document.getElementById('invEscudos').innerText = d.escudos;
+        document.getElementById('invBombas').innerText = d.bombas;
+
+        const btnEscudo = document.getElementById('btnUsarEscudo');
+        if (btnEscudo) {
+            btnEscudo.disabled = (d.escudos <= 0 || d.eliminado);
+        }
+
+        const badgeP = document.getElementById('badgePermanencia');
+        if (d.permanencia) {
+            badgeP.innerText = `⏳ Cosechando ${d.permanencia.item} (${d.permanencia.segRestantes}s)`;
+            badgeP.classList.remove('d-none');
+        } else {
+            badgeP.classList.add('d-none');
+        }
+    }
+
+    // ========================================================
+    // PERMANENCIA CON VALIDACIÓN DE STOCK LLENO
+    // ========================================================
+    function clickSimpleGuarida(colorLado, lvl) {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        if (colorLado !== miEquipo) return;
+        const d = jugadoresData[miNombre];
+        if (d.eliminado || d.permanencia) return;
+
+        d.celda = lvl;
+        sincronizarEstado();
+    }
+
+    function clickDobleGuarida(colorLado, lvl) {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        const d = jugadoresData[miNombre];
+        if (d.eliminado) return;
+
+        // Si está en permanencia, no puede hacer nada hasta terminar
+        if (d.permanencia) {
+            mostrarAviso("⚠️ No puedes desplazarte ni plantar bombas mientras estés en permanencia.");
+            return;
+        }
+
+        if (colorLado === miEquipo) {
+            d.celda = lvl;
+            abrirModalPermanencia();
+        } else {
+            // Plantar bomba en guarida rival (validando stock)
+            if (d.bombas <= 0) {
+                mostrarAviso("❌ No posees bombas 💣 en tu inventario.");
+                return;
+            }
+            d.bombas--;
+            actualizarMiInventarioUI();
+            canal.send({ type: 'broadcast', event: 'bomba_plantada', payload: { lado: colorLado, celda: lvl } });
+            recibirBombaPlantada({ lado: colorLado, celda: lvl });
+            sincronizarEstado();
+        }
+    }
+
+    function abrirModalPermanencia() {
+        const d = jugadoresData[miNombre];
+        if (!d) return;
+
+        const tieneBalas = (d.balas >= 1);
+
+        // Validaciones de stock máximo
+        const balaLlena = (d.balas >= 6);
+        const escudoLleno = (d.escudos >= 2);
+        const vidaLlena = (d.vidas >= 3);
+        const bombaLlena = (d.bombas >= 4);
+
+        // Botón Bala: solo se deshabilita si ya tiene 6
+        document.getElementById('btnPermBala').disabled = balaLlena;
+        document.getElementById('lblStockPermBala').innerText = balaLlena ? "Lleno (6/6)" : "+1 Bala";
+
+        // Escudo, Corazón y Bomba: bloqueados si no tiene al menos 1 bala O si tienen stock lleno
+        const bloqueoSinBalas = !tieneBalas;
+
+        // Escudo
+        document.getElementById('btnPermEscudo').disabled = bloqueoSinBalas || escudoLleno;
+        document.getElementById('lblStockPermEscudo').innerText = bloqueoSinBalas 
+            ? "🔒 Requiere 1 bala" 
+            : (escudoLleno ? "Lleno (2/2)" : "+1 Escudo");
+
+        // Corazón
+        document.getElementById('btnPermCorazon').disabled = bloqueoSinBalas || vidaLlena;
+        document.getElementById('lblStockPermCorazon').innerText = bloqueoSinBalas 
+            ? "🔒 Requiere 1 bala" 
+            : (vidaLlena ? "Lleno (3/3)" : "+1 Vida");
+
+        // Bomba
+        document.getElementById('btnPermBomba').disabled = bloqueoSinBalas || bombaLlena;
+        document.getElementById('lblStockPermBomba').innerText = bloqueoSinBalas 
+            ? "🔒 Requiere 1 bala" 
+            : (bombaLlena ? "Lleno (4/4)" : "+1 Bomba");
+
+        const modal = new bootstrap.Modal(document.getElementById('modalPermanencia'));
+        modal.show();
+    }
+
+    function activarPermanencia(item, seg) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalPermanencia'));
+        if (modal) modal.hide();
+
+        let segRestantes = seg;
+        if (!jugadoresData[miNombre]) {
+            jugadoresData[miNombre] = { vidas: 3, balas: 1, escudos: 1, bombas: 0, celda: 1, eliminado: false };
+        }
+
+        jugadoresData[miNombre].permanencia = { item: item, segRestantes: segRestantes };
+        actualizarMiInventarioUI();
+        sincronizarEstado();
+
+        clearInterval(timerPermanenciaLocal);
+        timerPermanenciaLocal = setInterval(() => {
+            if (operacionesCongeladas) return;
+
+            segRestantes--;
+
+            if (jugadoresData[miNombre]) {
+                jugadoresData[miNombre].permanencia = { item: item, segRestantes: segRestantes };
+            }
+
+            actualizarMiInventarioUI();
+            renderizarGuaridas();
+
+            if (segRestantes <= 0) {
+                clearInterval(timerPermanenciaLocal);
+                timerPermanenciaLocal = null;
+
+                const yo = jugadoresData[miNombre];
+                if (yo) {
+                    if (item === 'bala' && yo.balas < 6) yo.balas++;
+                    if (item === 'escudo' && yo.escudos < 2) yo.escudos++;
+                    if (item === 'corazon' && yo.vidas < 3) yo.vidas++;
+                    if (item === 'bomba' && yo.bombas < 4) yo.bombas++;
+                    yo.permanencia = null;
+                }
+
+                mostrarAviso(`🎉 ¡Permanencia completada! Obtuviste +1 ${item}.`);
+                actualizarMiInventarioUI();
+                sincronizarEstado();
+            }
+        }, 1000);
+    }
+
+    // ========================================================
+    // ACTIVACIÓN DE ESCUDO MANUAL Y COLECTIVO
+    // ========================================================
+// ACTIVACIÓN DE ESCUDO: 100% MANUAL POR EL JUGADOR
+    function activarEscudoDefensivo() {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        const d = jugadoresData[miNombre];
+        if (!d || d.eliminado) return;
+
+        if (d.escudos <= 0) {
+            mostrarAviso("❌ No tienes escudos 🛡️ en tu inventario.");
+            return;
+        }
+
+        const celdaKey = `${miEquipo}_${d.celda}`;
+        if (escudosActivos[celdaKey]) {
+            mostrarAviso("🛡️ Tu guarida ya cuenta con una cúpula de escudo activa.");
+            return;
+        }
+
+        // Se descuenta obligatoriamente del inventario del jugador
+        d.escudos--;
+        escudosActivos[celdaKey] = true;
+        actualizarMiInventarioUI();
+        renderizarGuaridas();
+
+        canal.send({
+            type: 'broadcast',
+            event: 'escudo_activado',
+            payload: { jugador: miNombre, equipo: miEquipo, celda: d.celda }
+        });
+
+        mostrarAviso(`🛡️ ¡Desplegaste tu escudo en la Guarida [${d.celda}]! Protege a la celda contra 1 bomba.`);
+        sincronizarEstado();
+    }
+
+    function recibirEscudoActivado(payload) {
+        const celdaKey = `${payload.equipo}_${payload.celda}`;
+        escudosActivos[celdaKey] = true;
+        renderizarGuaridas();
+        if (payload.equipo === miEquipo) {
+            mostrarAviso(`🛡️ ¡${payload.jugador} activó un escudo colectivo en la Guarida [${payload.celda}]!`);
+        }
+    }
+
+    // ========================================================
+    // DETONACIÓN DE BOMBAS Y ABSORCIÓN DE ESCUDO
+    // ========================================================
+    function recibirBombaPlantada(payload) {
+        const key = `${payload.lado}_${payload.celda}`;
+        if (bombasPlantadas[key]) return;
+
+        bombasPlantadas[key] = { seg: 3, lado: payload.lado, celda: payload.celda };
+        renderizarGuaridas();
+        mostrarAviso(`⚠️ ¡Bomba 💣 plantada en Guarida [${payload.celda}] del equipo ${payload.lado.toUpperCase()}! Detona en 3s.`);
+        iniciarTimerBombas();
+    }
+
+    function iniciarTimerBombas() {
+        if (timerBombasInterval) return;
+        timerBombasInterval = setInterval(() => {
+            if (operacionesCongeladas) return;
+
+            const keys = Object.keys(bombasPlantadas);
+            if (keys.length === 0) {
+                clearInterval(timerBombasInterval);
+                timerBombasInterval = null;
+                return;
+            }
+
+            keys.forEach(k => {
+                bombasPlantadas[k].seg--;
+                if (bombasPlantadas[k].seg <= 0) {
+                    const info = bombasPlantadas[k];
+                    delete bombasPlantadas[k];
+                    ejecutarExplosionAnimada(info.lado, info.celda);
+                }
+            });
+            renderizarGuaridas();
+        }, 1000);
+    }
+
+    function ejecutarExplosionAnimada(lado, celda) {
+        const guaridaEl = document.getElementById(`guarida_${lado}_${celda}`);
+        if (guaridaEl) {
+            const exp = document.createElement('div');
+            exp.className = 'explosion-overlay';
+            exp.innerText = '💥';
+            guaridaEl.appendChild(exp);
+            setTimeout(() => exp.remove(), 900);
+        }
+
+        const pantalla = document.getElementById('pantallaJuego');
+        pantalla.classList.add('screen-shake');
+        setTimeout(() => pantalla.classList.remove('screen-shake'), 400);
+        reproducirSonido('sndExplosion');
+
+        const celdaKey = `${lado}_${celda}`;
+        const equipoLista = (lado === 'rojo') ? equipoRojo : equipoAzul;
+        const ocupantes = equipoLista.filter(nom => jugadoresData[nom]?.celda === celda && !jugadoresData[nom]?.eliminado);
+
+        if (escudosActivos[celdaKey]) {
+            delete escudosActivos[celdaKey];
+            mostrarAviso(`🛡️ ¡El escudo activo en la Guarida [${celda}] neutralizó la bomba 💥 y se consumió!`);
+        } else {
+            if (ocupantes.length > 0) {
+                ocupantes.forEach(nom => {
+                    jugadoresData[nom].vidas--;
+                    if (jugadoresData[nom].vidas <= 0) jugadoresData[nom].eliminado = true;
+                });
+                mostrarAviso(`💥 ¡Explosión en Guarida [${celda}]! Los ocupantes perdieron 1 ❤️.`);
+            }
+        }
+
+        verificarFinPartida();
+        sincronizarEstado();
+    }
+
+    // ========================================================
+    // DONACIONES
+    // ========================================================
+    function abrirModalDonar(companeroNom) {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        companeroSeleccionadoParaDonar = companeroNom;
+
+        const dMio = jugadoresData[miNombre];
+        document.getElementById('donarDestinatarioNombre').innerText = companeroNom;
+        document.getElementById('stockBala').innerText = dMio.balas;
+        document.getElementById('stockEscudo').innerText = dMio.escudos;
+        document.getElementById('stockCorazon').innerText = dMio.vidas;
+        document.getElementById('stockBomba').innerText = dMio.bombas;
+
+        document.getElementById('btnDonarBala').disabled = (dMio.balas <= 0);
+        document.getElementById('btnDonarEscudo').disabled = (dMio.escudos <= 0);
+        document.getElementById('btnDonarCorazon').disabled = (dMio.vidas <= 1);
+        document.getElementById('btnDonarBomba').disabled = (dMio.bombas <= 0);
+
+        const modal = new bootstrap.Modal(document.getElementById('modalDonacion'));
+        modal.show();
+    }
+
+    function ejecutarDonacion(itemKey, topeMaximo) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDonacion'));
+        if (modal) modal.hide();
+
+        const dMio = jugadoresData[miNombre];
+        const dDestino = jugadoresData[companeroSeleccionadoParaDonar];
+
+        if (!dDestino || dDestino.eliminado) {
+            mostrarAviso("❌ El compañero no puede recibir suministros.");
+            return;
+        }
+
+        if (dDestino[itemKey] >= topeMaximo) {
+            mostrarAviso(`⚠️ ${companeroSeleccionadoParaDonar} ya tiene el máximo permitido de este suministro.`);
+            return;
+        }
+
+        dMio[itemKey]--;
+        dDestino[itemKey]++;
+
+        canal.send({
+            type: 'broadcast',
+            event: 'donacion_recibida',
+            payload: { de: miNombre, para: companeroSeleccionadoParaDonar, item: itemKey }
+        });
+
+        mostrarAviso(`🎁 Donaste un suministro a ${companeroSeleccionadoParaDonar}.`);
+        sincronizarEstado();
+    }
+
+    function recibirDonacion(payload) {
+        if (miNombre === payload.para) {
+            mostrarAviso(`🎁 ¡${payload.de} te donó un suministro (${payload.item})!`);
+        }
+    }
+
+    // ========================================================
+    // RETOS Y ARENA CINEMÁTICA CON CONGELAMIENTO
+    // ========================================================
+    function retarJugador(rival) {
+        if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+        const dMio = jugadoresData[miNombre];
+        if (dMio.eliminado) return;
+
+        if (dMio.balas <= 0) {
+            mostrarAviso("❌ No posees balas • para participar en un duelo.");
+            return;
+        }
+
+        const dRival = jugadoresData[rival];
+        if (!dRival || dRival.balas <= 0) {
+            mostrarAviso(`❌ ${rival} no tiene balas • para combatir. Reto cancelado y no se concede bomba.`);
+            return;
+        }
+
+        canal.send({ type: 'broadcast', event: 'reto_lanzado', payload: { retador: miNombre, retado: rival } });
+        mostrarAviso(`⚔️ Has retado a ${rival}. Esperando respuesta (5s)...`);
+
+        if (rival === "Cerebro") {
+            setTimeout(() => {
+                fetch('/api/cerebro-accion-endgame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        tipo: "responder_reto", 
+                        cerebro_data: jugadoresData["Cerebro"],
+                        retador_data: jugadoresData[miNombre]
+                    })
+                }).then(r => r.json()).then(res => {
+                    canal.send({ type: 'broadcast', event: 'reto_respuesta', payload: { retador: miNombre, retado: "Cerebro", acepta: res.acepta } });
+                    recibirRespuestaReto({ retador: miNombre, retado: "Cerebro", acepta: res.acepta });
+                });
+            }, 1000);
+        }
+    }
+
+    function recibirRetoLanzado(payload) {
+        if (miNombre === payload.retado) {
+            document.getElementById('retadorNombre').innerText = payload.retador;
+            const modal = new bootstrap.Modal(document.getElementById('modalReto'));
+            modal.show();
+
+            let seg = 5;
+            const badge = document.getElementById('badgeTimerReto');
+            clearInterval(timerRetoInterval);
+            timerRetoInterval = setInterval(() => {
+                seg--;
+                badge.innerText = `${seg}s`;
+                if (seg <= 0) {
+                    clearInterval(timerRetoInterval);
+                    modal.hide();
+                    responderReto(false);
+                }
+            }, 1000);
+        }
+    }
+
+    function responderReto(acepta) {
+        clearInterval(timerRetoInterval);
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalReto'));
+        if (modal) modal.hide();
+
+        const retador = document.getElementById('retadorNombre').innerText;
+        canal.send({ type: 'broadcast', event: 'reto_respuesta', payload: { retador: retador, retado: miNombre, acepta: acepta } });
+        recibirRespuestaReto({ retador: retador, retado: miNombre, acepta: acepta });
+    }
+
+    function recibirRespuestaReto(payload) {
+        const { retador, retado, acepta } = payload;
+
+        if (!acepta) {
+            if (jugadoresData[retador] && jugadoresData[retador].bombas < 4) {
+                jugadoresData[retador].bombas++;
+            }
+            mostrarAviso(`❌ ${retado} no aceptó el enfrentamiento. Como tenía balas, ¡${retador} recibe 1 Bomba 💣!`);
+            sincronizarEstado();
+            return;
+        }
+
+        operacionesCongeladas = true;
+
+        if (jugadoresData[retado] && jugadoresData[retado].bombas < 4) {
+            jugadoresData[retado].bombas++;
+        }
+        if (jugadoresData[retador].balas > 0) jugadoresData[retador].balas--;
+        if (jugadoresData[retado].balas > 0) jugadoresData[retado].balas--;
+
+        mostrarAviso(`⚔️ ¡${retado} aceptó el duelo! Operaciones pausadas temporalmente.`);
+
+        const esRetadorRojo = equipoRojo.includes(retador);
+        const jRojo = esRetadorRojo ? retador : retado;
+        const jAzul = esRetadorRojo ? retado : retador;
+
+        dueloActivo = {
+            rojo: jRojo,
+            azul: jAzul,
+            posOriginalRojo: jugadoresData[jRojo].celda,
+            posOriginalAzul: jugadoresData[jAzul].celda,
+            posRojo: null,
+            dispRojo: null,
+            posAzul: null,
+            dispAzul: null
+        };
+
+        desplegarArenaCinematica();
+    }
+
+    function desplegarArenaCinematica() {
+        const arena = document.getElementById('arenaCinematica');
+        arena.classList.remove('d-none');
+        document.getElementById('arenaNombreRojo').innerText = dueloActivo.rojo;
+        document.getElementById('arenaNombreAzul').innerText = dueloActivo.azul;
+        document.getElementById('arenaTarjetaResultados').classList.add('d-none');
+        document.getElementById('arenaInstruccion').innerHTML = "Elige tu posición de cobertura y hacia qué trinchera enemiga disparas con tu <strong>pistola 🔫</strong> (Sin escudos 🛡️)";
+
+        ['arenaRojoFila1', 'arenaRojoFila2', 'arenaAzulFila1', 'arenaAzulFila2'].forEach(id => {
+            const el = document.getElementById(id);
+            el.className = "celda-arena";
+        });
+        ['arenaIconosR1', 'arenaIconosR2', 'arenaIconosA1', 'arenaIconosA2'].forEach(id => {
+            document.getElementById(id).innerHTML = "";
+        });
+
+        let seg = 5;
+        const badge = document.getElementById('arenaTimerBadge');
+        badge.innerText = "5s";
+
+        if (dueloActivo.azul === "Cerebro" && esAdmin) {
+            fetch('/api/cerebro-accion-endgame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo: "enfrentamiento_eleccion" })
+            }).then(r => r.json()).then(res => {
+                canal.send({ type: 'broadcast', event: 'duelo_eleccion', payload: { jugador: "Cerebro", posicion: res.posicion, disparo: res.disparo } });
+                recibirEleccionDuelo({ jugador: "Cerebro", posicion: res.posicion, disparo: res.disparo });
+            });
+        }
+
+        clearInterval(timerArenaInterval);
+        timerArenaInterval = setInterval(() => {
+            seg--;
+            badge.innerText = `${seg}s`;
+            if (seg <= 0) {
+                clearInterval(timerArenaInterval);
+                resolverResolucionPistolas();
+            }
+        }, 1000);
+    }
+
+    function clickArena(ladoColumna, filaNum) {
+        if (!dueloActivo) return;
+        const soyRojo = (miNombre === dueloActivo.rojo);
+        const soyAzul = (miNombre === dueloActivo.azul);
+        if (!soyRojo && !soyAzul) return;
+
+        if (soyRojo) {
+            if (ladoColumna === 'rojo') dueloActivo.posRojo = filaNum;
+            else dueloActivo.dispRojo = filaNum;
+        } else if (soyAzul) {
+            if (ladoColumna === 'azul') dueloActivo.posAzul = filaNum;
+            else dueloActivo.dispAzul = filaNum;
+        }
+
+        actualizarVisualArena();
+
+        if (soyRojo && dueloActivo.posRojo && dueloActivo.dispRojo) {
+            canal.send({ type: 'broadcast', event: 'duelo_eleccion', payload: { jugador: miNombre, posicion: dueloActivo.posRojo, disparo: dueloActivo.dispRojo } });
+        } else if (soyAzul && dueloActivo.posAzul && dueloActivo.dispAzul) {
+            canal.send({ type: 'broadcast', event: 'duelo_eleccion', payload: { jugador: miNombre, posicion: dueloActivo.posAzul, disparo: dueloActivo.dispAzul } });
+        }
+    }
+
+    function recibirEleccionDuelo(payload) {
+        if (!dueloActivo) return;
+        if (payload.jugador === dueloActivo.rojo) {
+            dueloActivo.posRojo = payload.posicion;
+            dueloActivo.dispRojo = payload.disparo;
+        } else if (payload.jugador === dueloActivo.azul) {
+            dueloActivo.posAzul = payload.posicion;
+            dueloActivo.dispAzul = payload.disparo;
+        }
+    }
+
+    function actualizarVisualArena() {
+        const soyRojo = (miNombre === dueloActivo.rojo);
+        const soyAzul = (miNombre === dueloActivo.azul);
+
+        if (soyRojo) {
+            if (dueloActivo.posRojo) {
+                document.getElementById('arenaRojoFila1').className = dueloActivo.posRojo === 1 ? "celda-arena celda-pos-elegida" : "celda-arena";
+                document.getElementById('arenaRojoFila2').className = dueloActivo.posRojo === 2 ? "celda-arena celda-pos-elegida" : "celda-arena";
+                document.getElementById('arenaIconosR1').innerHTML = dueloActivo.posRojo === 1 ? `<span class="badge bg-success">${dueloActivo.rojo}</span>` : "";
+                document.getElementById('arenaIconosR2').innerHTML = dueloActivo.posRojo === 2 ? `<span class="badge bg-success">${dueloActivo.rojo}</span>` : "";
+            }
+            if (dueloActivo.dispRojo) {
+                document.getElementById('arenaAzulFila1').className = dueloActivo.dispRojo === 1 ? "celda-arena celda-disp-elegido" : "celda-arena";
+                document.getElementById('arenaAzulFila2').className = dueloActivo.dispRojo === 2 ? "celda-arena celda-disp-elegido" : "celda-arena";
+                document.getElementById('arenaIconosA1').innerHTML = dueloActivo.dispRojo === 1 ? "🔫" : "";
+                document.getElementById('arenaIconosA2').innerHTML = dueloActivo.dispRojo === 2 ? "🔫" : "";
+            }
+        } else if (soyAzul) {
+            if (dueloActivo.posAzul) {
+                document.getElementById('arenaAzulFila1').className = dueloActivo.posAzul === 1 ? "celda-arena celda-pos-elegida" : "celda-arena";
+                document.getElementById('arenaAzulFila2').className = dueloActivo.posAzul === 2 ? "celda-arena celda-pos-elegida" : "celda-arena";
+                document.getElementById('arenaIconosA1').innerHTML = dueloActivo.posAzul === 1 ? `<span class="badge bg-primary">${dueloActivo.azul}</span>` : "";
+                document.getElementById('arenaIconosA2').innerHTML = dueloActivo.posAzul === 2 ? `<span class="badge bg-primary">${dueloActivo.azul}</span>` : "";
+            }
+            if (dueloActivo.dispAzul) {
+                document.getElementById('arenaRojoFila1').className = dueloActivo.dispAzul === 1 ? "celda-arena celda-disp-elegido" : "celda-arena";
+                document.getElementById('arenaRojoFila2').className = dueloActivo.dispAzul === 2 ? "celda-arena celda-disp-elegido" : "celda-arena";
+                document.getElementById('arenaIconosR1').innerHTML = dueloActivo.dispAzul === 1 ? "🔫" : "";
+                document.getElementById('arenaIconosR2').innerHTML = dueloActivo.dispAzul === 2 ? "🔫" : "";
+            }
+        }
+    }
+
+    function resolverResolucionPistolas() {
+        if (!dueloActivo.posRojo) dueloActivo.posRojo = Math.random() < 0.5 ? 1 : 2;
+        if (!dueloActivo.dispRojo) dueloActivo.dispRojo = Math.random() < 0.5 ? 1 : 2;
+        if (!dueloActivo.posAzul) dueloActivo.posAzul = Math.random() < 0.5 ? 1 : 2;
+        if (!dueloActivo.dispAzul) dueloActivo.dispAzul = Math.random() < 0.5 ? 1 : 2;
+
+        reproducirSonido('sndDuelo');
+
+        ['arenaIconosR1', 'arenaIconosR2', 'arenaIconosA1', 'arenaIconosA2'].forEach(id => {
+            document.getElementById(id).innerHTML = "";
+        });
+
+        document.getElementById(`arenaIconosR${dueloActivo.posRojo}`).innerHTML = `<span class="badge bg-danger p-2">${dueloActivo.rojo}</span>`;
+        document.getElementById(`arenaIconosA${dueloActivo.posAzul}`).innerHTML = `<span class="badge bg-primary p-2">${dueloActivo.azul}</span>`;
+
+        const aciertaRojo = (dueloActivo.dispRojo === dueloActivo.posAzul);
+        const aciertaAzul = (dueloActivo.dispAzul === dueloActivo.posRojo);
+
+        const elDispRojoEnAzul = document.getElementById(`arenaIconosA${dueloActivo.dispRojo}`);
+        if (aciertaRojo) {
+            elDispRojoEnAzul.innerHTML += ` <span class="fs-4 animate__animated animate__headShake">🔫💥</span>`;
+        } else {
+            elDispRojoEnAzul.innerHTML += ` <span class="fs-4 text-warning">🔫 (Vacío)</span>`;
+        }
+
+        const elDispAzulEnRojo = document.getElementById(`arenaIconosR${dueloActivo.dispAzul}`);
+        if (aciertaAzul) {
+            elDispAzulEnRojo.innerHTML += ` <span class="fs-4 animate__animated animate__headShake">🔫💥</span>`;
+        } else {
+            elDispAzulEnRojo.innerHTML += ` <span class="fs-4 text-warning">🔫 (Vacío)</span>`;
+        }
+
+        let veredicto = "";
+        if (aciertaRojo && aciertaAzul) {
+            jugadoresData[dueloActivo.rojo].vidas--;
+            jugadoresData[dueloActivo.azul].vidas--;
+            if (jugadoresData[dueloActivo.rojo].bombas < 4) jugadoresData[dueloActivo.rojo].bombas++;
+            if (jugadoresData[dueloActivo.azul].bombas < 4) jugadoresData[dueloActivo.azul].bombas++;
+            veredicto = "💥 ¡FUEGO CRUZADO! Ambos acertaron con sus pistolas 🔫.";
+        } else if (aciertaRojo && !aciertaAzul) {
+            jugadoresData[dueloActivo.azul].vidas--;
+            if (jugadoresData[dueloActivo.rojo].bombas < 4) jugadoresData[dueloActivo.rojo].bombas++;
+            veredicto = `🎯 ¡IMPACTO! ${dueloActivo.rojo} acertó sobre ${dueloActivo.azul}.`;
+        } else if (!aciertaRojo && aciertaAzul) {
+            jugadoresData[dueloActivo.rojo].vidas--;
+            if (jugadoresData[dueloActivo.azul].bombas < 4) jugadoresData[dueloActivo.azul].bombas++;
+            veredicto = `🎯 ¡IMPACTO! ${dueloActivo.azul} acertó sobre ${dueloActivo.rojo}.`;
+        } else {
+            veredicto = "💨 Ambos disparos 🔫 dieron en trincheras vacías.";
+        }
+
+        const tarjeta = document.getElementById('arenaTarjetaResultados');
+        document.getElementById('arenaTituloResumen').innerText = veredicto;
+        document.getElementById('arenaCuerpoResumen').innerHTML = `
+            <div class="mb-1">🔴 <strong>${dueloActivo.rojo}</strong>: Se cubrió en Fila ${dueloActivo.posRojo} | Disparó 🔫 a Fila ${dueloActivo.dispRojo} (${aciertaRojo ? 'ACERTÓ 🎯 (+1 💣)' : 'FALLÓ 💨'})</div>
+            <div>🔵 <strong>${dueloActivo.azul}</strong>: Se cubrió en Fila ${dueloActivo.posAzul} | Disparó 🔫 a Fila ${dueloActivo.dispAzul} (${aciertaAzul ? 'ACERTÓ 🎯 (+1 💣)' : 'FALLÓ 💨'})</div>
+        `;
+        tarjeta.classList.remove('d-none');
+
+        jugadoresData[dueloActivo.rojo].celda = dueloActivo.posOriginalRojo;
+        jugadoresData[dueloActivo.azul].celda = dueloActivo.posOriginalAzul;
+
+        if (jugadoresData[dueloActivo.rojo].vidas <= 0) jugadoresData[dueloActivo.rojo].eliminado = true;
+        if (jugadoresData[dueloActivo.azul].vidas <= 0) jugadoresData[dueloActivo.azul].eliminado = true;
+
+        setTimeout(() => {
+            document.getElementById('arenaCinematica').classList.add('d-none');
+            dueloActivo = null;
+
+            operacionesCongeladas = false;
+            if (Object.keys(bombasPlantadas).length > 0) {
+                iniciarTimerBombas();
+            }
+
+            mostrarAviso("⚔️ El duelo ha concluido. Operaciones reanudadas.");
+            verificarFinPartida();
+            sincronizarEstado();
+        }, 5000);
+    }
+
+    // ========================================================
+    // CICLO TÁCTICO DE CEREBRO (AUTONOMÍA IA)
+    // ========================================================
+    function iniciarCicloCerebro() {
+        // Solo el administrador coordina las peticiones al backend para no duplicar llamadas
+        if (!esAdmin) return;
+        clearInterval(loopTacticoCerebro);
+
+        // Intervalo realista de 8 a 10 segundos para dar tiempo a jugar a los humanos
+        loopTacticoCerebro = setInterval(() => {
+            if (!partidaEnCurso || dueloActivo || operacionesCongeladas) return;
+
+            const cData = jugadoresData["Cerebro"];
+            if (!cData || cData.eliminado || cData.vidas <= 0) return;
+
+            fetch('/api/cerebro-accion-endgame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipo: "cerebro_ciclo_tactico",
+                    cerebro_data: cData,
+                    bombas_plantadas: bombasPlantadas,
+                    escudos_activos: escudosActivos,
+                    jugadoresData: jugadoresData,
+                    equipoRojo: equipoRojo,
+                    total_celdas: obtenerTotalCeldas()
+                })
+            }).then(r => r.json()).then(res => {
+                if (!res || res.accion === "ninguna") return;
+
+                // A. Activar escudo defensivo solo si hay bomba en su celda
+                if (res.accion === "activar_escudo") {
+                    const celdaKey = `azul_${res.celda}`;
+                    if (cData.escudos > 0 && !escudosActivos[celdaKey]) {
+                        cData.escudos--;
+                        escudosActivos[celdaKey] = true;
+                        canal.send({
+                            type: 'broadcast',
+                            event: 'escudo_activado',
+                            payload: { jugador: "Cerebro", equipo: "azul", celda: res.celda }
+                        });
+                        recibirEscudoActivado({ jugador: "Cerebro", equipo: "azul", celda: res.celda });
+                        sincronizarEstado();
+                    }
+                }
+
+                // B. Plantar bomba en guarida roja
+                else if (res.accion === "plantar_bomba") {
+                    if (cData.bombas > 0 && !cData.permanencia) {
+                        cData.bombas--;
+                        canal.send({ 
+                            type: 'broadcast', 
+                            event: 'bomba_plantada', 
+                            payload: { lado: 'rojo', celda: res.celda } 
+                        });
+                        recibirBombaPlantada({ lado: 'rojo', celda: res.celda });
+                        sincronizarEstado();
+                    }
+                }
+
+                // C. Retar a un rival rojo
+                else if (res.accion === "retar") {
+                    if (!cData.permanencia) {
+                        retarJugador(res.rival);
+                    }
+                }
+
+                // D. Iniciar permanencia para cosechar
+                else if (res.accion === "permanencia") {
+                    cData.celda = res.celda;
+                    cData.permanencia = { item: res.item, segRestantes: res.seg };
+                    sincronizarEstado();
+
+                    let segC = res.seg;
+                    const timerCerebro = setInterval(() => {
+                        if (operacionesCongeladas) return;
+
+                        segC--;
+                        if (jugadoresData["Cerebro"] && jugadoresData["Cerebro"].permanencia) {
+                            jugadoresData["Cerebro"].permanencia.segRestantes = segC;
+                        }
+                        renderizarGuaridas();
+
+                        if (segC <= 0) {
+                            clearInterval(timerCerebro);
+                            const yoC = jugadoresData["Cerebro"];
+                            if (yoC) {
+                                if (res.item === 'bala' && yoC.balas < 6) yoC.balas++;
+                                if (res.item === 'escudo' && yoC.escudos < 2) yoC.escudos++;
+                                if (res.item === 'corazon' && yoC.vidas < 3) yoC.vidas++;
+                                if (res.item === 'bomba' && yoC.bombas < 4) yoC.bombas++;
+                                yoC.permanencia = null;
+                            }
+                            sincronizarEstado();
+                        }
+                    }, 1000);
+                }
+            }).catch(() => {});
+        }, 9000); // Se evalúa cada 9 segundos, dándole naturalidad de jugador
+    }
+
+    // ========================================================
+    // SINCRONIZACIÓN Y REINICIO
+    // ========================================================
+    function sincronizarEstado() {
+        renderizarTodo();
+        canal.send({
+            type: 'broadcast',
+            event: 'actualizar_estado_global',
+            payload: { jugadoresData: jugadoresData, bombasPlantadas: bombasPlantadas, escudosActivos: escudosActivos }
+        });
+    }
+
+    function recibirEstadoGlobal(payload) {
+        if (payload.jugadoresData) {
+            Object.keys(payload.jugadoresData).forEach(k => {
+                if (k === miNombre && jugadoresData[miNombre]?.permanencia) {
+                    const miP = jugadoresData[miNombre].permanencia;
+                    jugadoresData[k] = payload.jugadoresData[k];
+                    jugadoresData[k].permanencia = miP;
+                } else {
+                    jugadoresData[k] = payload.jugadoresData[k];
+                }
+            });
+        }
+        if (payload.bombasPlantadas) bombasPlantadas = payload.bombasPlantadas;
+        if (payload.escudosActivos) escudosActivos = payload.escudosActivos;
+        renderizarTodo();
+    }
+
+    function iniciarPartida() {
+        partidaEnCurso = true;
+        canal.send({ type: 'broadcast', event: 'iniciar_partida', payload: {} });
+        recibirInicioPartida();
+    }
+
+    function recibirInicioPartida() {
+        partidaEnCurso = true;
+        mostrarAviso("⚔️ ¡Partida en curso! Muévete, cosecha suministros o reta a los rivales.");
+        document.getElementById('btnIniciarAdmin').disabled = true;
+
+        // Si Cerebro está en el equipo Azul (porque la cantidad de humanos era impar), se activa su IA
+        if (equipoAzul.includes("Cerebro")) {
+            iniciarCicloCerebro();
+        }
+
+        renderizarTodo();
+    }
+
+    function verificarFinPartida() {
+        const vivosRojos = equipoRojo.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
+        const vivosAzules = equipoAzul.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
+
+        if (vivosRojos.length === 0 || vivosAzules.length === 0) {
+            let ganador = "";
+            if (vivosRojos.length === 0 && vivosAzules.length === 0) {
+                ganador = "🤝 ¡EMPATE TOTAL! Ambas facciones cayeron.";
+            } else if (vivosRojos.length === 0) {
+                ganador = "🔵 ¡EL EQUIPO AZUL HA GANADO LA PARTIDA!";
+            } else {
+                ganador = "🔴 ¡EL EQUIPO ROJO HA GANADO LA PARTIDA!";
+            }
+
+            const el = document.getElementById('alertaResultado');
+            el.className = "alert alert-danger py-2 small fw-bold shadow-sm";
+            el.innerHTML = `🏁 <strong>FIN DEL JUEGO</strong><br>${ganador}`;
+            el.classList.remove('d-none');
+            partidaEnCurso = false;
+            clearInterval(loopTacticoCerebro);
+        }
+    }
+
+    function mostrarAviso(txt) {
+        document.getElementById('txtEstado').innerHTML = txt;
+    }
+
+    async function reiniciarPartida() {
+        if (!confirm("¿Deseas reiniciar la partida completa?")) return;
+        await client.from('participantes_wargame').delete().neq('id', 0);
+        canal.send({ type: 'broadcast', event: 'reiniciar', payload: {} });
+        resetearEstadoLocal();
+    }
+
+    function resetearEstadoLocal() {
+        partidaEnCurso = false;
+        operacionesCongeladas = false;
+        miNombre = "";
+        miEquipo = "";
+        equipoRojo = [];
+        equipoAzul = [];
+        jugadoresData = {};
+        bombasPlantadas = {};
+        escudosActivos = {};
+        dueloActivo = null;
+
+        clearInterval(timerRetoInterval);
+        clearInterval(timerArenaInterval);
+        clearInterval(timerPermanenciaLocal);
+        clearInterval(timerBombasInterval);
+        clearInterval(loopTacticoCerebro);
+        timerBombasInterval = null;
+
+        document.getElementById('btnListo').disabled = false;
+        document.getElementById('inputNombre').disabled = false;
+        document.getElementById('inputNombre').value = "";
+        document.getElementById('msgConfirmacion').classList.add('d-none');
+        document.getElementById('panelMiInventario').classList.add('d-none');
+        document.getElementById('arenaCinematica').classList.add('d-none');
+        document.getElementById('alertaResultado').classList.add('d-none');
+        document.getElementById('btnIniciarAdmin').disabled = false;
+        document.getElementById('txtEstado').innerText = "Esperando combatientes...";
+
+        renderizarTodo();
+    }
+
+    cargarParticipantes();
+</script>
+{% endblock %}

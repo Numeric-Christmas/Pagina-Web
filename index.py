@@ -304,5 +304,118 @@ def cerebro_accion_wargame():
 
     return jsonify({"eleccion": None})
 
+import random
+from flask import render_template, request, jsonify
+
+@app.route('/endgame')
+def endgame_view():
+    return render_template('endgame.html')
+
+@app.route('/api/cerebro-accion-endgame', methods=['POST'])
+def cerebro_accion_endgame():
+    data = request.get_json() or {}
+    tipo = data.get("tipo")
+
+    # 1. Cuando un humano reta a Cerebro
+    if tipo == "responder_reto":
+        cerebro_data = data.get("cerebro_data", {})
+        retador_data = data.get("retador_data", {})
+        
+        vidas_c = cerebro_data.get("vidas", 3)
+        vidas_r = retador_data.get("vidas", 3)
+        balas_c = cerebro_data.get("balas", 1)
+
+        # Si le queda 1 sola vida y el rival tiene ventaja, suele evitar el duelo
+        if vidas_c == 1 and vidas_r > 1:
+            acepta = random.random() < 0.25
+        elif balas_c >= 1:
+            acepta = random.random() < 0.85
+        else:
+            acepta = False
+
+        return jsonify({"acepta": acepta})
+
+    # 2. Decisiones dentro de la arena 2x2
+    elif tipo == "enfrentamiento_eleccion":
+        pos = random.choice([1, 2])
+        disp = random.choice([1, 2])
+        return jsonify({"posicion": pos, "disparo": disp})
+
+    # 3. Decisiones autónomas en el mapa (Turno de Cerebro)
+    elif tipo == "cerebro_ciclo_tactico":
+        c_data = data.get("cerebro_data", {})
+        if not c_data or c_data.get("eliminado") or c_data.get("vidas", 0) <= 0:
+            return jsonify({"accion": "ninguna"})
+
+        celda_actual = c_data.get("celda", 1)
+        bombas_plantadas = data.get("bombas_plantadas", {})
+        escudos_activos = data.get("escudos_activos", {})
+        jugadores = data.get("jugadoresData", {})
+        equipo_rojo = data.get("equipoRojo", [])
+        total_celdas = data.get("total_celdas", 3)
+
+        # PRIORIDAD 1: DEFENSA
+        # Si hay una bomba en su celda y no hay escudo activo, usa su escudo si tiene
+        key_propia = f"azul_{celda_actual}"
+        if key_propia in bombas_plantadas and not escudos_activos.get(key_propia):
+            if c_data.get("escudos", 0) > 0:
+                return jsonify({"accion": "activar_escudo", "celda": celda_actual})
+
+        # Si Cerebro está en permanencia cosechando, NO puede moverse ni plantar bombas
+        if c_data.get("permanencia"):
+            return jsonify({"accion": "ninguna"})
+
+        # PRIORIDAD 2: ATACAR / PLANTAR BOMBA (si tiene bombas y el rival no tiene bomba en esa celda)
+        if c_data.get("bombas", 0) > 0 and random.random() < 0.40:
+            celdas_libres = [lvl for lvl in range(1, total_celdas + 1) if f"rojo_{lvl}" not in bombas_plantadas]
+            if celdas_libres:
+                return jsonify({"accion": "plantar_bomba", "celda": random.choice(celdas_libres)})
+
+        # PRIORIDAD 3: RETAR A UN RIVAL (si tiene balas y hay un rival con balas)
+        if c_data.get("balas", 0) > 0 and random.random() < 0.35:
+            rivales_con_bala = [
+                nom for nom in equipo_rojo 
+                if jugadores.get(nom, {}).get("balas", 0) > 0 and not jugadores.get(nom, {}).get("eliminado")
+            ]
+            if rivales_con_bala:
+                # Elige preferentemente al que tenga menos vida
+                rivales_con_bala.sort(key=lambda nom: jugadores.get(nom, {}).get("vidas", 3))
+                return jsonify({"accion": "retar", "rival": rivales_con_bala[0]})
+
+        # PRIORIDAD 4: COSECHAR (Permanencia si le faltan recursos)
+        if not c_data.get("permanencia"):
+            total_celdas = data.get("total_celdas", 3)
+            nueva_celda = random.randint(1, total_celdas)
+            balas_cerebro = c_data.get("balas", 0)
+
+            opciones = []
+
+            # REGLA ESTRICTA: Si tiene 0 balas, OBLIGATORIAMENTE debe cosechar bala
+            if balas_cerebro == 0:
+                opciones.append(("bala", 5))
+            else:
+                # Si tiene al menos 1 bala, recién puede elegir otros artículos según necesidad
+                if c_data.get("vidas", 3) < 3:
+                    opciones.append(("corazon", 15))
+                if c_data.get("escudos", 1) < 2:
+                    opciones.append(("escudo", 10))
+                if c_data.get("bombas", 0) < 4:
+                    opciones.append(("bomba", 20))
+                if balas_cerebro < 6:
+                    opciones.append(("bala", 5))
+
+            if opciones:
+                eleccion = opciones[0]
+                return jsonify({
+                    "accion": "permanencia",
+                    "celda": nueva_celda,
+                    "item": eleccion[0],
+                    "seg": eleccion[1]
+                })
+
+        return jsonify({"accion": "ninguna"})
+
+    return jsonify({"status": "ok"})
+
 if __name__ == '__main__':
     app.run(debug=True)
