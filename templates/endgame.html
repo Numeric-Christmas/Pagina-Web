@@ -5,6 +5,7 @@
     <!-- Audios Opcionales -->
     <audio id="sndExplosion" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
     <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+    <audio id="sndEntradaDuelo" preload="auto" src="{{ url_for('static', filename='audio/duelo.mp3') }}"></audio>
 
     <!-- BLOQUE CABECERA Y REGISTRO (Se oculta al iniciar para ocupar toda la pantalla) -->
     <div id="bloqueCabeceraRegistro">
@@ -46,7 +47,7 @@
     <!-- Barra de Inventario Personal con Botón de Escudo -->
     <div id="panelMiInventario" class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura text-light d-none">
         <div class="d-flex justify-content-around align-items-center small flex-wrap">
-            <span class="fw-bold text-muted">Tu Inventario:</span>
+            <!-- <span class="fw-bold text-muted">Tu Inventario:</span> -->
             <span>❤️ <strong id="invVidas" class="text-danger">3</strong>/3</span>
             <span>• <strong id="invBalas" class="text-warning">1</strong>/6</span>
             
@@ -746,12 +747,19 @@
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalPermanencia'));
         if (modal) modal.hide();
 
-        let segRestantes = seg;
+        const finTimestamp = Date.now() + (seg * 1000);
+
         if (!jugadoresData[miNombre]) {
             jugadoresData[miNombre] = { vidas: 3, balas: 1, escudos: 1, bombas: 0, celda: 1, eliminado: false };
         }
 
-        jugadoresData[miNombre].permanencia = { item: item, segRestantes: segRestantes };
+        // Guardamos el momento exacto en que debe culminar
+        jugadoresData[miNombre].permanencia = { 
+            item: item, 
+            finAt: finTimestamp,
+            segRestantes: seg 
+        };
+        
         actualizarMiInventarioUI();
         sincronizarEstado();
 
@@ -759,33 +767,38 @@
         timerPermanenciaLocal = setInterval(() => {
             if (operacionesCongeladas) return;
 
-            segRestantes--;
-
-            if (jugadoresData[miNombre]) {
-                jugadoresData[miNombre].permanencia = { item: item, segRestantes: segRestantes };
+            const yo = jugadoresData[miNombre];
+            if (!yo || !yo.permanencia) {
+                clearInterval(timerPermanenciaLocal);
+                timerPermanenciaLocal = null;
+                return;
             }
+
+            // Calculamos los segundos restantes exactos según el reloj
+            const msRestantes = yo.permanencia.finAt - Date.now();
+            const segActuales = Math.max(0, Math.ceil(msRestantes / 1000));
+            yo.permanencia.segRestantes = segActuales;
 
             actualizarMiInventarioUI();
             renderizarCeldas();
 
-            if (segRestantes <= 0) {
+            if (segActuales <= 0) {
                 clearInterval(timerPermanenciaLocal);
                 timerPermanenciaLocal = null;
 
-                const yo = jugadoresData[miNombre];
-                if (yo) {
-                    if (item === 'bala' && yo.balas < 6) yo.balas++;
-                    if (item === 'escudo' && yo.escudos < 2) yo.escudos++;
-                    if (item === 'corazon' && yo.vidas < 3) yo.vidas++;
-                    if (item === 'bomba' && yo.bombas < 4) yo.bombas++;
-                    yo.permanencia = null;
-                }
+                if (yo.permanencia.item === 'bala' && yo.balas < 6) yo.balas++;
+                if (yo.permanencia.item === 'escudo' && yo.escudos < 2) yo.escudos++;
+                if (yo.permanencia.item === 'corazon' && yo.vidas < 3) yo.vidas++;
+                if (yo.permanencia.item === 'bomba' && yo.bombas < 4) yo.bombas++;
+                
+                const itemObtenido = yo.permanencia.item;
+                yo.permanencia = null;
 
-                mostrarAviso(`🎉 ¡Permanencia completada! Obtuviste +1 ${item}.`);
+                mostrarAviso(`🎉 ¡Permanencia completada! Obtuviste +1 ${itemObtenido}.`);
                 actualizarMiInventarioUI();
                 sincronizarEstado();
             }
-        }, 1000);
+        }, 500);
     }
 
     // ========================================================
@@ -1053,6 +1066,13 @@
 
         operacionesCongeladas = true;
 
+        // Congelar la permanencia/cosecha propia si está en curso
+        const yo = jugadoresData[miNombre];
+        if (yo && yo.permanencia && yo.permanencia.finAt) {
+            yo.permanencia.segRestantes = Math.max(1, Math.ceil((yo.permanencia.finAt - Date.now()) / 1000));
+            delete yo.permanencia.finAt;
+        }
+
         if (jugadoresData[retado] && jugadoresData[retado].bombas < 4) {
             jugadoresData[retado].bombas++;
         }
@@ -1082,6 +1102,8 @@
     function desplegarArenaCinematica() {
         const arena = document.getElementById('arenaCinematica');
         arena.classList.remove('d-none');
+        // Reproducir sonido al iniciar el duelo
+        reproducirSonido('sndEntradaDuelo');
         document.getElementById('arenaNombreRojo').innerText = dueloActivo.rojo;
         document.getElementById('arenaNombreAzul').innerText = dueloActivo.azul;
         document.getElementById('arenaTarjetaResultados').classList.add('d-none');
@@ -1258,6 +1280,12 @@
             dueloActivo = null;
 
             operacionesCongeladas = false;
+            // Reanudar la permanencia local calculando su nueva fecha límite
+            const yo = jugadoresData[miNombre];
+            if (yo && yo.permanencia && yo.permanencia.segRestantes) {
+                yo.permanencia.finAt = Date.now() + (yo.permanencia.segRestantes * 1000);
+            }
+
             if (Object.keys(bombasPlantadas).length > 0) {
                 iniciarTimerBombas();
             }
@@ -1446,10 +1474,11 @@
     function recibirEstadoGlobal(payload) {
         if (payload.jugadoresData) {
             Object.keys(payload.jugadoresData).forEach(k => {
-                if (k === miNombre && jugadoresData[miNombre]?.permanencia) {
-                    const miP = jugadoresData[miNombre].permanencia;
+                if (k === miNombre) {
+                    // Mantenemos intacta nuestra permanencia local activa
+                    const miPerm = jugadoresData[miNombre]?.permanencia;
                     jugadoresData[k] = payload.jugadoresData[k];
-                    jugadoresData[k].permanencia = miP;
+                    jugadoresData[k].permanencia = miPerm;
                 } else {
                     jugadoresData[k] = payload.jugadoresData[k];
                 }
