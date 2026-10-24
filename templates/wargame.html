@@ -5,8 +5,9 @@
     <!-- Audios del Juego -->
     <audio id="sndFondo" preload="auto" loop src="{{ url_for('static', filename='audio/sound.mp3') }}"></audio>
     <audio id="sndExplosion" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
-    <audio id="sndHielo" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
     <audio id="sndClick" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+    <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
+    <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
 
     <!-- BLOQUE CABECERA Y REGISTRO -->
     <div id="bloqueCabeceraRegistro">
@@ -302,7 +303,6 @@
         return Math.max(3, Math.round((3 * n) / 2));
     }
 
-    // Comprueba si un jugador ya tiene una bomba plantada y activa en el tablero
     function jugadorTieneBombaActiva(nombreJugador) {
         return Object.values(bombasArmadas).some(b => b && b.atacante === nombreJugador);
     }
@@ -315,6 +315,8 @@
         .on('broadcast', { event: 'iniciar_partida' }, () => recibirInicioPartida())
         .on('broadcast', { event: 'sincronizar_estado' }, (p) => recibirSincronizacion(p.payload))
         .on('broadcast', { event: 'aviso_global' }, (p) => mostrarAviso(p.payload.texto))
+        .on('broadcast', { event: 'sonido_cooler' }, () => reproducirSonido('sndCooler'))
+        .on('broadcast', { event: 'sonido_freezer' }, () => reproducirSonido('sndFreezer'))
         .on('broadcast', { event: 'fin_partida' }, (p) => mostrarPantallaVictoria(p.payload))
         .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
@@ -464,24 +466,34 @@
     }
 
     function renderizarListaParticipantes() {
-        const pintarLista = (lista, ulId) => {
+        const pintarLista = (lista, ulId, ladoEquipo) => {
             const ul = document.getElementById(ulId);
             if (!ul) return;
+            const esMiMismoBando = (miEquipo === ladoEquipo);
+
             ul.innerHTML = lista.map(nom => {
                 const d = jugadoresData[nom] || { vidas: 3, eliminado: false, bombas: 0, hielos: 0 };
                 if (d.eliminado || d.vidas <= 0) {
                     return `<li class="py-1 border-bottom border-secondary texto-caido"><span class="text-decoration-line-through">⚰️ ${nom}</span></li>`;
                 }
+
+                let datosInventario = "";
+                if (esMiMismoBando) {
+                    datosInventario = `(❤️${d.vidas} 💣${d.bombas}/3 🧊${d.hielos}/3)`;
+                } else {
+                    datosInventario = `(❤️${d.vidas} 💣? 🧊?)`;
+                }
+
                 return `
                     <li class="py-1 border-bottom border-secondary">
-                        <strong class="text-light">${nom}</strong> (❤️${d.vidas} 💣${d.bombas}/3 🧊${d.hielos}/3)
+                        <strong class="text-light">${nom}</strong> ${datosInventario}
                     </li>
                 `;
             }).join('');
         };
 
-        pintarLista(equipoRojo, 'listaRojos');
-        pintarLista(equipoAzul, 'listaAzules');
+        pintarLista(equipoRojo, 'listaRojos', 'rojo');
+        pintarLista(equipoAzul, 'listaAzules', 'azul');
     }
 
     function actualizarMiInventarioUI() {
@@ -513,7 +525,6 @@
         }
 
         jugadoresData[miNombre].celda = lvl;
-        reproducirSonido('sndClick');
         sincronizarEstado();
     }
 
@@ -544,6 +555,7 @@
                 if (item === 'bomba') dMio.bombas++;
                 else if (item === 'hielo') dMio.hielos++;
 
+                // Solo suena click.mp3 aquí en su propio dispositivo
                 reproducirSonido('sndClick');
                 notificarAviso(`🎁 ${miNombre} recogió 1 ${item}.`);
                 sincronizarEstado();
@@ -565,7 +577,6 @@
             celdaObjetivoAtaque = { lado: lado, celda: lvl };
             document.getElementById('modalAtaqueCeldaNum').innerText = `${lado.toUpperCase()} [${lvl}]`;
 
-            // Validación estricta: No permitir plantar bomba si ya tiene una activa
             const tieneBombaActiva = jugadorTieneBombaActiva(miNombre);
             const btnBomba = document.getElementById('btnLanzarBomba');
             const msgBomba = document.getElementById('msgBombaPendiente');
@@ -611,7 +622,7 @@
             if (dMio.hielos <= 0) return;
             dMio.hielos--;
             celdasCongeladas[celdaKey] = { segRestantes: 7 };
-            reproducirSonido('sndHielo');
+            // Sin sonido freezer.mp3 aquí
             notificarAviso(`🧊 ¡${miNombre} congeló la celda [${celda}] del rival por 7s!`);
         }
 
@@ -672,7 +683,7 @@
                 huboCambios = true;
                 if (bombasArmadas[k].seg <= 0) {
                     const info = bombasArmadas[k];
-                    delete bombasArmadas[k]; // Libera el candado del atacante al explotar
+                    delete bombasArmadas[k];
                     procesarDetonacionBomba(info.lado, info.celda, info.atacante);
                 }
             });
@@ -759,7 +770,7 @@
                 }
             }
 
-            // D) ATAQUE TÁCTICO: Solo planta bomba si NO tiene una bomba activa previa
+            // D) ATAQUE TÁCTICO: Lanza bomba o congela
             if (c.bombas > 0 || c.hielos > 0) {
                 const targetCelda = Math.floor(Math.random() * maxC) + 1;
                 const targetKey = `rojo_${targetCelda}`;
@@ -770,12 +781,19 @@
                         c.bombas--;
                         bombasArmadas[targetKey] = { seg: 3, atacante: "Cerebro", lado: 'rojo', celda: targetCelda };
                         notificarAviso(`⚠️ ¡Cerebro plantó una BOMBA 💣 en [${targetCelda}] de ROJO!`);
+
+                        // CONDICIÓN FREEZER.MP3: Cerebro planta bomba en una celda roja congelada que tiene ocupantes adentro
+                        const tieneRivalesCongelados = celdasCongeladas[targetKey] && equipoRojo.some(nom => jugadoresData[nom]?.celda === targetCelda && !jugadoresData[nom]?.eliminado);
+                        if (tieneRivalesCongelados) {
+                            canal.send({ type: 'broadcast', event: 'sonido_freezer', payload: {} });
+                            reproducirSonido('sndFreezer');
+                        }
+
                         sincronizarEstado();
                         return;
                     } else if (c.hielos > 0) {
                         c.hielos--;
                         celdasCongeladas[targetKey] = { segRestantes: 7 };
-                        reproducirSonido('sndHielo');
                         notificarAviso(`🧊 ¡Cerebro congeló la celda [${targetCelda}] de ROJO por 7s!`);
                         sincronizarEstado();
                         return;
@@ -823,10 +841,18 @@
         else {
             ocupantes.forEach(nom => {
                 jugadoresData[nom].vidas--;
+
+                // CONDICIÓN COOLER.MP3: Cerebro pierde sus 3 corazones y queda eliminado
+                if (nom === "Cerebro" && jugadoresData["Cerebro"].vidas <= 0) {
+                    canal.send({ type: 'broadcast', event: 'sonido_cooler', payload: {} });
+                    reproducirSonido('sndCooler');
+                }
+
                 if (jugadoresData[nom].vidas <= 0) {
                     jugadoresData[nom].eliminado = true;
                 }
             });
+
             notificarAviso(`💥 ¡Explosión en [${celda}]! Los ocupantes perdieron 1 ❤️.`);
         }
 
@@ -894,7 +920,11 @@
                 colorClase = "text-danger";
             }
 
-            const payloadFin = { ganador, colorClase };
+            const payloadFin = { 
+                ganador: ganador, 
+                colorClase: colorClase,
+                jugadoresDataFinal: JSON.parse(JSON.stringify(jugadoresData))
+            };
             canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
             mostrarPantallaVictoria(payloadFin);
         }
@@ -906,6 +936,9 @@
         clearInterval(loopCronometroCeldas);
         clearInterval(loopIaCerebro);
 
+        const datosOficiales = payload.jugadoresDataFinal || jugadoresData;
+        jugadoresData = datosOficiales;
+
         const pantalla = document.getElementById('pantallaVictoriaCinematica');
         const tit = document.getElementById('victoriaTitulo');
         tit.innerText = payload.ganador;
@@ -916,7 +949,7 @@
             const ul = document.getElementById(ulId);
             if (!ul) return;
             ul.innerHTML = lista.map(nom => {
-                const d = jugadoresData[nom] || { vidas: 0, eliminado: true };
+                const d = datosOficiales[nom] || { vidas: 0, eliminado: true };
                 if (!d.eliminado && d.vidas > 0) {
                     return `<li class="py-2 border-bottom border-secondary text-success fw-bold">🗿 ${nom} <span class="badge bg-success ms-1">Sobreviviente (❤️${d.vidas})</span></li>`;
                 } else {
@@ -959,7 +992,7 @@
             contenedorPrincipal.classList.add('px-3');
         }
 
-        mostrarAviso("⚔️ ¡Guerra iniciada! Suministros cada 5s. Solo 1 bomba activa por jugador a la vez.");
+        mostrarAviso("⚔️ ¡Guerra iniciada! Suministros cada 5s. Doble clic para recoger o atacar.");
         document.getElementById('btnIniciarAdmin').disabled = true;
 
         iniciarCiclosGlobales();

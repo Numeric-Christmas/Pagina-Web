@@ -817,6 +817,55 @@
         renderizarCeldas();
         mostrarAviso(`⚠️ ¡Bomba 💣 plantada en [${payload.celda}] del equipo ${payload.lado.toUpperCase()}! Detona en 3s.`);
         iniciarTimerBombas();
+
+        // EVALUACIÓN ESTRATÉGICA DE CEREBRO (Admin Host)
+        if (esAdmin && payload.lado === 'azul') {
+            const cData = jugadoresData["Cerebro"];
+            if (cData && !cData.eliminado && cData.celda === payload.celda) {
+                const celdaKey = `azul_${cData.celda}`;
+                const escudosDisponibles = cData.escudos || 0;
+                const totalCeldas = obtenerTotalCeldas();
+
+                // 1. Analizar celdas seguras disponibles en su trinchera azul
+                const celdasSeguras = [];
+                for (let lvl = 1; lvl <= totalCeldas; lvl++) {
+                    if (lvl !== payload.celda && !bombasPlantadas[`azul_${lvl}`]) {
+                        celdasSeguras.push(lvl);
+                    }
+                }
+
+                const puedeHuir = celdasSeguras.length > 0 && !cData.permanencia;
+                const celdaYaEscudada = !!escudosActivos[celdaKey];
+
+                if (celdaYaEscudada) return;
+
+                // 2. Si no puede huir o tiene 2 escudos al tope, blinda con escudo. Si puede huir, ahorra el escudo.
+                const prefiereGastarEscudo = escudosDisponibles > 0 && (!puedeHuir || (escudosDisponibles === 2 && Math.random() < 0.25));
+
+                if (prefiereGastarEscudo) {
+                    setTimeout(() => {
+                        if (cData.escudos <= 0) return;
+                        cData.escudos--;
+                        escudosActivos[celdaKey] = true;
+                        canal.send({
+                            type: 'broadcast',
+                            event: 'escudo_activado',
+                            payload: { jugador: "Cerebro", equipo: "azul", celda: cData.celda }
+                        });
+                        recibirEscudoActivado({ jugador: "Cerebro", equipo: "azul", celda: cData.celda });
+                        mostrarAviso(`🛡️ ¡Cerebro decidió atrincherarse y activó su escudo en [${cData.celda}]!`);
+                        sincronizarEstado();
+                    }, 500);
+                } else if (puedeHuir) {
+                    setTimeout(() => {
+                        const destino = celdasSeguras[Math.floor(Math.random() * celdasSeguras.length)];
+                        cData.celda = destino;
+                        mostrarAviso(`🏃 ¡Cerebro ahorró recursos y evacuó a la celda segura [${destino}]!`);
+                        sincronizarEstado();
+                    }, 650);
+                }
+            }
+        }
     }
 
     function iniciarTimerBombas() {
@@ -1465,7 +1514,7 @@
                     }
                 }, 1000);
             }
-        }, 9000);
+        }, 3500);
     }
 
     function verificarFinPartida() {
