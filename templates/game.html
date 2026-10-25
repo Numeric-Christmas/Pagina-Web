@@ -1,890 +1,884 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="container py-2 text-center" style="max-width: 520px;">
-    <!-- Audios Locales -->
-    <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
-    <audio id="sndVacio" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
-    <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
+<div id="pantallaJuego" class="container py-2 text-center no-select" style="max-width: 800px;">
+    <!-- Audios -->
     <audio id="sndFondo" preload="auto" loop src="{{ url_for('static', filename='audio/sound.mp3') }}"></audio>
+    <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
+    <audio id="sndClick" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
+    <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
+    <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
 
-    <!-- Encabezado con Botón de Silencio para sound.mp3 -->
-    <div class="d-flex align-items-center justify-content-center gap-2 mb-1">
-        <h2 class="fw-bold text-danger m-0 fs-4">🎯 Ruleta Rusa en Vivo</h2>
-        <button id="btnMuteMusica" class="btn btn-sm btn-outline-secondary border-0 p-1" style="font-size: 1.15rem; line-height: 1;" onclick="toggleSilencioMusica()" title="Silenciar música de fondo">
-            🔇
-        </button>
-    </div>
-    <p class="text-muted small mb-2" style="font-size: 0.75rem;">Tambor de 12 recámaras (10 balas y 2 vacías). 3 impactos eliminan al jugador.</p>
+    <!-- CABECERA Y REGISTRO -->
+    <div id="bloqueRegistro">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div style="width: 38px;"></div>
+            <h2 class="fw-bold text-light m-0 fs-4">🎡 Ruleta Rusa: El Juicio de Cerebro</h2>
+            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()">
+                🔊
+            </button>
+        </div>
 
-    <!-- Marcador de Tambor y Balas -->
-    <div class="card p-1 shadow-sm border rounded-3 mb-2 bg-light">
-        <div class="d-flex justify-content-around align-items-center">
-            <div>
-                <span class="text-muted small d-block" style="font-size: 0.72rem;">Tiros restantes:</span>
-                <span id="tirosRestantes" class="fw-bold text-dark" style="font-size: 0.95rem;">12 / 12</span>
+        <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
+            <div class="input-group input-group-sm">
+                <input type="text" id="inputNombre" class="form-control bg-dark text-white border-secondary" placeholder="Tu nombre (Ej: Cris admin)" maxlength="25">
+                <button class="btn btn-danger px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
             </div>
-            <div>
-                <span class="text-muted small d-block" style="font-size: 0.72rem;">Recámaras:</span>
-                <span id="balasRestantes" class="fw-bold text-danger" style="font-size: 0.95rem;">10 💥 | 2 💨</span>
+            <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
+                ¡Registrado! Esperando inicio de la ruleta.
             </div>
         </div>
     </div>
 
-    <!-- Casillero de Registro -->
-    <div class="card p-2 shadow-sm border rounded-3 mb-2">
-        <div class="input-group input-group-sm">
-            <input type="text" id="inputNombre" class="form-control" placeholder="Ej: Cristian" maxlength="40">
-            <button class="btn btn-success px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
-        </div>
-        <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
-            ¡Listo! Esperando el giro de la ruleta.
-        </div>
-    </div>
-
-    <!-- Temporizador visual de decisión (10s) -->
-    <div id="badgeTemporizador" class="badge bg-danger p-2 fs-6 mb-2 d-none shadow-sm">
-        ⏳ Tiempo para decidir: <span id="segundosRestantes">10</span>s
-    </div>
-
-    <!-- ÁREA COMPACTA: PISTOLA + RULETA + BOTONES EMOJIS VERTICALES -->
-    <div class="d-flex align-items-center justify-content-center gap-2 my-2 position-relative">
-        
-        <!-- Pistola a la izquierda apuntando a la ruleta -->
-        <div style="font-size: 2.2rem; transform: scaleX(-1); line-height: 1; user-select: none;">
-            🔫
-        </div>
-
-        <!-- Ruleta Compacta (240x240) -->
-        <canvas id="canvasRuleta" width="240" height="240" class="shadow-sm rounded-circle border border-3 border-dark"></canvas>
-
-        <!-- PANEL VERTICAL DE EMOJIS A LA DERECHA -->
-        <div id="panelTurnoAccion" class="d-flex flex-column gap-2 opacity-25" style="pointer-events: none; transition: opacity 0.3s ease;">
-            <button id="btnDisparo" class="btn btn-danger btn-sm p-1 shadow-sm rounded-circle" style="width: 38px; height: 38px; font-size: 1.2rem;" onclick="tomarDecision('disparo')" title="Disparo directo">
-                💠
-            </button>
-            <button id="btnAntihorario" class="btn btn-outline-primary btn-sm p-1 shadow-sm rounded-circle" style="width: 38px; height: 38px; font-size: 1.2rem;" onclick="tomarDecision('antihorario')" title="Girar Antihorario">
-                🔄
-            </button>
-            <button id="btnHorario" class="btn btn-outline-success btn-sm p-1 shadow-sm rounded-circle" style="width: 38px; height: 38px; font-size: 1.2rem;" onclick="tomarDecision('horario')" title="Girar Horario">
-                🔃
-            </button>
-            <button id="btnOpuesto" class="btn btn-outline-warning text-dark btn-sm p-1 shadow-sm rounded-circle" style="width: 38px; height: 38px; font-size: 1.2rem;" onclick="tomarDecision('opuesto')" title="Girar al Opuesto (180°)">
-                ↔️
-            </button>
-        </div>
-    </div>
-
-    <!-- Panel Exclusivo de Admin -->
-    <div id="panelAdmin" class="mt-2 d-none">
-        <div class="alert alert-warning py-1 px-3 d-inline-block small fw-bold mb-1" style="font-size: 0.75rem;">
-            ⭐ Modo Anfitrión
-        </div>
+    <!-- PANEL ADMIN -->
+    <div id="panelAdmin" class="mb-2 d-none">
         <div class="d-flex justify-content-center gap-2">
-            <button id="btnGirar" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="lanzarGiro()">
-                🎰 GIRAR RULETA
+            <button id="btnIniciarAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarPartida()">
+                🚀 INICIAR RULETA
             </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="reiniciarRuleta()">
+            <button class="btn btn-outline-secondary btn-sm text-light" onclick="reiniciarPartida()">
                 🗑️ Reiniciar
             </button>
         </div>
     </div>
 
-    <!-- Mensaje de espera para participantes normales -->
-    <div id="panelEspera" class="text-muted small fst-italic mt-1" style="font-size: 0.75rem;">
-        ⏳ Esperando que el anfitrión inicie el juego...
+    <!-- ESTADO GLOBAL -->
+    <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold mb-2 shadow-sm text-warning">
+        <span id="txtEstado">Esperando participantes para la Ruleta...</span>
     </div>
 
-    <!-- Alerta de Turno / Resultado -->
-    <div id="alertaResultado" class="alert alert-danger mt-2 fw-bold fs-6 d-none shadow-sm py-2"></div>
+    <!-- BOTÓN DE EVASIÓN PARA EL IMPOSTOR -->
+    <div id="panelImpostor" class="mb-2 d-none">
+        <button class="btn btn-warning btn-sm px-4 fw-bold shadow pulse-btn" onclick="evadirComoImpostor()">
+            🕵️ EVADIR DUELO (Pasa la pistola a la Ruleta)
+        </button>
+    </div>
 
-    <!-- Lista de Participantes -->
-    <div class="mt-2">
-        <h6 class="fw-bold text-muted small mb-1" style="font-size: 0.75rem;">Participantes (<span id="totalConectados">0</span>):</h6>
-        <div id="listaNombres" class="d-flex flex-wrap justify-content-center gap-1 mt-1"></div>
+    <!-- CANVAS DE LA RULETA CON CEREBRO EN EL CENTRO -->
+    <div class="d-flex justify-content-center align-items-center my-2 position-relative">
+        <div class="canvas-container">
+            <div class="aguja-ruleta">🔻</div>
+            <canvas id="cvsRuleta" width="500" height="500"></canvas>
+        </div>
+    </div>
+
+    <!-- LISTA DE JUGADORES Y CORAZONES -->
+    <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start my-2">
+        <span class="fw-bold small text-white text-uppercase d-block mb-1 border-bottom border-secondary pb-1" style="font-size: 0.8rem;">
+            Sobrevivientes en el Círculo
+        </span>
+        <div id="listaJugadores" class="d-flex flex-wrap gap-2 justify-content-center py-1"></div>
     </div>
 </div>
 
-<!-- SDK de Supabase -->
+<!-- ========================================== -->
+<!-- MODAL DE DUELO TÁCTICO 2 VS 2 (ENDGAME) -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalDuelo" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger shadow-lg bg-dark text-light">
+            <div class="modal-header py-2 bg-danger text-white justify-content-between">
+                <h6 class="modal-title fw-bold m-0">⚔️ Duelo Táctico 2 vs 2: <span id="lblDueloRival"></span></h6>
+                <span id="timerDuelo" class="badge bg-dark border border-light">10s</span>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <p id="lblInstruccionDuelo" class="small text-muted mb-2">
+                    Cerebro te ha emparejado para el sacrificio. Elige tu trinchera y a dónde disparas.
+                </p>
+
+                <!-- Selección de Búnker propio (Posición) -->
+                <div class="mb-3">
+                    <span class="small fw-bold text-info d-block mb-1">1. Elige tu Búnker de Posición:</span>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button type="button" id="btnPos1" class="btn btn-outline-info px-4 fw-bold" onclick="elegirPosicion(1)">Búnker 1</button>
+                        <button type="button" id="btnPos2" class="btn btn-outline-info px-4 fw-bold" onclick="elegirPosicion(2)">Búnker 2</button>
+                    </div>
+                </div>
+
+                <!-- Selección de Disparo al Rival -->
+                <div>
+                    <span class="small fw-bold text-danger d-block mb-1">2. Elige a qué Búnker Rival disparas:</span>
+                    <div class="d-flex justify-content-center gap-3">
+                        <button type="button" id="btnDisp1" class="btn btn-outline-danger px-4 fw-bold" onclick="elegirDisparo(1)">Disparar a 1</button>
+                        <button type="button" id="btnDisp2" class="btn btn-outline-danger px-4 fw-bold" onclick="elegirDisparo(2)">Disparar a 2</button>
+                    </div>
+                </div>
+
+                <div id="dueloEsperando" class="small text-warning mt-3 d-none">
+                    Decisiones tomadas. Esperando la resolución de Cerebro...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA CINEMÁTICA DE FIN DE PARTIDA -->
+<!-- ========================================== -->
+<div id="pantallaVictoria" class="d-none no-select">
+    <div class="victoria-content text-white text-center p-3">
+        <h1 id="vicTitulo" class="display-4 fw-bold text-uppercase mb-2 text-danger"></h1>
+        <p id="vicSubtitulo" class="lead text-light mb-4"></p>
+        <button class="btn btn-outline-light btn-sm px-4 fw-bold shadow" onclick="cerrarVictoria()">
+            Cerrar Pantalla ✖
+        </button>
+    </div>
+</div>
+
+<style>
+    body {
+        background-color: #0b0d13 !important;
+        background: radial-gradient(circle at 50% 20%, #151924 0%, #07090e 100%) !important;
+        color: #e9ecef;
+        min-height: 100vh;
+    }
+
+    .bg-tarjeta-oscura {
+        background-color: #12151f !important;
+        border-color: #272d3d !important;
+    }
+
+    .no-select {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .canvas-container {
+        position: relative;
+        width: 100%;
+        max-width: 440px;
+        aspect-ratio: 1 / 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #cvsRuleta {
+        width: 100%;
+        height: 100%;
+        display: block;
+        filter: drop-shadow(0 6px 20px rgba(0,0,0,0.8));
+    }
+
+    .aguja-ruleta {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 2rem;
+        z-index: 20;
+        pointer-events: none;
+        filter: drop-shadow(0 2px 6px rgba(255, 0, 0, 0.8));
+    }
+
+    .pulse-btn {
+        animation: pulsoBtn 1.2s infinite alternate;
+    }
+    @keyframes pulsoBtn {
+        from { transform: scale(1); box-shadow: 0 0 4px #ffc107; }
+        to { transform: scale(1.04); box-shadow: 0 0 16px #ffc107; }
+    }
+
+    #pantallaVictoria {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle, rgba(16,20,30,0.98) 0%, rgba(5,6,10,1) 100%);
+        z-index: 99999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     const SUPABASE_URL = "https://atvybxjsolqmadzojkfm.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0dnlieGpzb2xxbWFkem9qa2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MDg3NTgsImV4cCI6MjEwNDM4NDc1OH0.ks66J_l5S8DQ9FHxpc4e0INNDzCRlUyDb-vnH_l4WvM";
-    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 
     let miNombre = "";
     let esAdmin = false;
-    let participantesBase = [];
-    let participantes = [];
-    let impactos = {};
     let partidaEnCurso = false;
+    let estoyEliminado = false;
+    let soyImpostor = false;
 
-    // Estado individual de silencio para sound.mp3
-    let musicaSilenciada = false;
+    let participantes = []; // Lista completa ordenada
+    let jugadoresData = {};  // { 'Cris': { vidas: 3, eliminado: false, esImpostor: false, color: '#...' } }
+    let nombreImpostor = "";
 
-    // Temporizador de 10s
-    let intervaloTimer = null;
-    let tiempoRestante = 10;
-
-    // Comodines del usuario y del bot Cerebro
-    let comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
-    let comodinesCerebro = { antihorario: true, horario: true, opuesto: true };
-
-    let tambor = [];
-    let tiroActual = 0;
-    let juegoTerminado = false;
-    let enEsperaDecision = false;
-    let jugadorApuntadoActual = "";
-
-    const colores = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#00D8B6', '#E74C3C', '#2ECC71', '#F39C12'];
-    const canvas = document.getElementById('canvasRuleta');
-    const ctx = canvas.getContext('2d');
+    // Estado de la Ruleta
     let anguloActual = 0;
     let girando = false;
 
-    function desbloquearAudio() {
-        const audios = [
-            document.getElementById('sndDisparo'),
-            document.getElementById('sndVacio'),
-            document.getElementById('sndFreezer'),
-            document.getElementById('sndFondo')
-        ];
-        audios.forEach(a => {
-            if (a) {
-                a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
-            }
-        });
-    }
-    document.addEventListener('click', desbloquearAudio, { once: true });
+    // Duelo en curso
+    let dueloActivo = null; // { p1: '...', p2: '...' }
+    let miEleccionPos = null;
+    let miEleccionDisp = null;
+    let decisionesDuelo = {}; // { 'Nombre': { pos, disp } }
 
-    // Alternar silencio de sound.mp3 exclusivamente
-    function toggleSilencioMusica() {
-        musicaSilenciada = !musicaSilenciada;
-        const bgm = document.getElementById('sndFondo');
-        const btnMute = document.getElementById('btnMuteMusica');
+    const COLORES_PALETA = [
+        '#e63946', '#457b9d', '#2a9d8f', '#e76f51', '#9b5de5',
+        '#f15bb5', '#00bbf9', '#00f5d4', '#fee440', '#3a86ff'
+    ];
 
-        if (bgm) {
-            bgm.muted = musicaSilenciada;
-        }
-
-        if (btnMute) {
-            btnMute.innerText = musicaSilenciada ? "🔊" : "🔇";
-            btnMute.title = musicaSilenciada ? "Activar música de fondo" : "Silenciar música de fondo";
+    function reproducirSonido(id) {
+        const audio = document.getElementById(id);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
         }
     }
 
-    function reproducirMusicaFondo() {
-        const bgm = document.getElementById('sndFondo');
-        if (bgm && bgm.paused) {
-            bgm.volume = 0.4;
-            bgm.muted = musicaSilenciada; // Respeta la preferencia del jugador
-            bgm.play().catch(e => console.log("Audio de fondo en espera:", e));
-        }
+    function toggleMuteMusica() {
+        const audio = document.getElementById('sndFondo');
+        const btn = document.getElementById('btnMuteMusica');
+        audio.muted = !audio.muted;
+        btn.innerText = audio.muted ? "🔇" : "🔊";
     }
 
-    function detenerMusicaFondo() {
-        const bgm = document.getElementById('sndFondo');
-        if (bgm) {
-            bgm.pause();
-            bgm.currentTime = 0;
-        }
-    }
-
-    function inicializarTambor() {
-        tambor = [true, true, true, true, true, true, true, true, true, true, false, false];
-        for (let i = tambor.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [tambor[i], tambor[j]] = [tambor[j], tambor[i]];
-        }
-        tiroActual = 0;
-        juegoTerminado = false;
-        enEsperaDecision = false;
-        actualizarMarcadorTambor();
-    }
-
-    function actualizarMarcadorTambor() {
-        document.getElementById('tirosRestantes').innerText = `${12 - tiroActual} / 12`;
-    }
-
-    function bloquearFormularioIngreso() {
-        partidaEnCurso = true;
-        const btnListo = document.getElementById('btnListo');
-        const inputNombre = document.getElementById('inputNombre');
-        
-        if (!miNombre) {
-            if (btnListo) {
-                btnListo.disabled = true;
-                btnListo.innerText = "Cerrado 🔒";
-            }
-            if (inputNombre) {
-                inputNombre.disabled = true;
-                inputNombre.placeholder = "Partida en curso...";
-            }
-            const msg = document.getElementById('msgConfirmacion');
-            if (msg) {
-                msg.className = "small text-danger mt-1";
-                msg.innerText = "🚫 La partida ya inició. No se admiten nuevos participantes.";
-                msg.classList.remove('d-none');
-            }
-        }
-    }
-
-    async function cargarEstadoPartida() {
-        const { data, error } = await client
-            .from('estado_ruleta')
-            .select('en_curso')
-            .eq('id', 1)
-            .maybeSingle();
-
-        if (!error && data) {
-            partidaEnCurso = data.en_curso;
-            if (partidaEnCurso) {
-                bloquearFormularioIngreso();
-                reproducirMusicaFondo();
-            }
-        }
-    }
-
-    // 1. Canal Realtime
-    const canal = client.channel('sala-ruleta');
+    const canal = client.channel('sala-ruleta-cerebro');
 
     canal
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_ruleta' }, () => {
-            cargarParticipantes();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'estado_ruleta' }, (payload) => {
-            if (payload.new && payload.new.en_curso !== undefined) {
-                partidaEnCurso = payload.new.en_curso;
-                if (partidaEnCurso) {
-                    bloquearFormularioIngreso();
-                    reproducirMusicaFondo();
-                }
-            }
-        })
-        .on('broadcast', { event: 'nuevo_participante' }, () => {
-            cargarParticipantes();
-        })
-        .on('broadcast', { event: 'girar_inicial' }, (payload) => {
-            bloquearFormularioIngreso();
-            reproducirMusicaFondo();
-            ejecutarAnimacionGiro(payload.payload.totalGiro, payload.payload.jugadorApuntado);
-        })
-        .on('broadcast', { event: 'ejecutar_decision' }, (payload) => {
-            aplicarDecisionGlobal(payload.payload);
-        })
-        .on('broadcast', { event: 'reiniciar' }, () => {
-            resetearEstadoLocal();
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_ruleta' }, () => cargarParticipantes())
+        .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
+        .on('broadcast', { event: 'iniciar_partida' }, (p) => recibirInicioPartida(p.payload))
+        .on('broadcast', { event: 'sincronizar_estado' }, (p) => recibirSincronizacion(p.payload))
+        .on('broadcast', { event: 'iniciar_duelo' }, (p) => recibirIniciarDuelo(p.payload))
+        .on('broadcast', { event: 'decision_duelo' }, (p) => recibirDecisionDuelo(p.payload))
+        .on('broadcast', { event: 'girar_ruleta_impostor' }, (p) => animarGiroRuleta(p.payload.gradosGiro, p.payload.resultado))
+        .on('broadcast', { event: 'fin_partida' }, (p) => recibirFinPartida(p.payload))
+        .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
 
-    // 2. Cargar participantes
     async function cargarParticipantes() {
         const { data, error } = await client
             .from('participantes_ruleta')
-            .select('nombre')
+            .select('nombre, id')
             .order('id', { ascending: true });
 
         if (!error && data) {
-            participantesBase = data.map(d => d.nombre);
-            participantes = [...participantesBase];
+            participantes = data.map(d => d.nombre);
 
-            if (participantes.length > 0 && participantes.length % 2 !== 0) {
-                participantes.push("Cerebro");
-            }
-
-            participantes.forEach(p => {
-                if (impactos[p] === undefined) impactos[p] = 0;
+            participantes.forEach((nom, idx) => {
+                if (!jugadoresData[nom]) {
+                    jugadoresData[nom] = {
+                        vidas: 3,
+                        eliminado: false,
+                        esImpostor: false,
+                        color: COLORES_PALETA[idx % COLORES_PALETA.length]
+                    };
+                }
             });
 
-            actualizarUI();
+            renderizarTodo();
         }
     }
 
-    // 3. Registrar al usuario
     async function unirse() {
-        if (partidaEnCurso) {
-            alert("La partida ya ha iniciado. No puedes unirte en este momento.");
-            return;
-        }
-
-        desbloquearAudio();
-
+        if (partidaEnCurso) return;
         const input = document.getElementById('inputNombre');
-        const valorTexto = input.value.trim();
-        if (!valorTexto) return;
+        const txt = input.value.trim();
+        if (!txt) return;
 
-        esAdmin = valorTexto.toLowerCase().includes("admin");
+        esAdmin = txt.toLowerCase().includes('admin');
+        const palabras = txt.split(/\s+/);
+        let nom = (palabras[0].toLowerCase() === 'admin' && palabras.length > 1) ? palabras[1] : palabras[0];
+        nom = nom.charAt(0).toUpperCase() + nom.slice(1).toLowerCase();
+        miNombre = nom;
 
-        const palabras = valorTexto.split(/\s+/);
-        let primerNombre = palabras[0];
-        if (primerNombre.toLowerCase() === "admin" && palabras.length > 1) {
-            primerNombre = palabras[1];
-        }
-        primerNombre = primerNombre.charAt(0).toUpperCase() + primerNombre.slice(1).toLowerCase();
-        miNombre = primerNombre;
-
-        const { error } = await client.from('participantes_ruleta').insert([{ nombre: primerNombre }]);
+        const { error } = await client.from('participantes_ruleta').insert([{ nombre: miNombre }]);
         if (!error) {
-            input.disabled = true;
             document.getElementById('btnListo').disabled = true;
+            document.getElementById('inputNombre').disabled = true;
             document.getElementById('msgConfirmacion').classList.remove('d-none');
-
-            if (esAdmin) {
-                document.getElementById('panelAdmin').classList.remove('d-none');
-                document.getElementById('panelEspera').classList.add('d-none');
-            }
+            if (esAdmin) document.getElementById('panelAdmin').classList.remove('d-none');
 
             await cargarParticipantes();
-
-            canal.send({
-                type: 'broadcast',
-                event: 'nuevo_participante',
-                payload: {}
-            });
-        } else {
-            console.error("Error al registrarse:", error);
-            alert("Hubo un error al unirse a la sala. Inténtalo de nuevo.");
+            canal.send({ type: 'broadcast', event: 'nuevo_participante', payload: {} });
         }
     }
 
-    // 4. Dibujar Ruleta (240px)
-    function dibujarRuleta() {
-        const num = participantes.length;
-        const centro = canvas.width / 2;
-        const radio = centro - 6;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // ========================================================
+    // RENDERIZADO DE LA RULETA (CANVAS)
+    // ========================================================
+    function renderizarTodo() {
+        dibujarRuleta();
+        renderizarListaJugadores();
+    }
 
-        if (num === 0) {
-            ctx.fillStyle = "#f8f9fa";
+    function obtenerSobrevivientes() {
+        return participantes.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
+    }
+
+    function dibujarRuleta() {
+        const cvs = document.getElementById('cvsRuleta');
+        if (!cvs) return;
+        const ctx = cvs.getContext('2d');
+        const centro = cvs.width / 2;
+        const radio = centro - 15;
+
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+        const vivos = obtenerSobrevivientes();
+        const totalVivos = vivos.length;
+
+        if (totalVivos === 0) {
+            // Fondo vacío si no hay participantes
+            ctx.fillStyle = '#161b26';
             ctx.beginPath();
-            ctx.arc(centro, centro, radio, 0, 2 * Math.PI);
+            ctx.arc(centro, centro, radio, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = "#6c757d";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText("Esperando jugadores...", centro, centro);
             return;
         }
 
-        const arco = (2 * Math.PI) / num;
+        const sectorAngulo = (Math.PI * 2) / totalVivos;
 
-        for (let i = 0; i < num; i++) {
-            const anguloInicio = anguloActual + i * arco - (arco / 2);
+        // 1. Dibujar Sectores de Jugadores
+        for (let i = 0; i < totalVivos; i++) {
+            const nom = vivos[i];
+            const startAng = anguloActual + (i * sectorAngulo);
+            const endAng = startAng + sectorAngulo;
 
             ctx.beginPath();
-            ctx.fillStyle = colores[i % colores.length];
             ctx.moveTo(centro, centro);
-            ctx.arc(centro, centro, radio, anguloInicio, anguloInicio + arco);
-            ctx.lineTo(centro, centro);
+            ctx.arc(centro, centro, radio, startAng, endAng);
+            ctx.closePath();
+            ctx.fillStyle = jugadoresData[nom]?.color || '#333';
             ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 2;
+
+            // Borde / Raya divisoria
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#0b0d13';
             ctx.stroke();
 
+            // Texto con Nombre de Jugador
             ctx.save();
             ctx.translate(centro, centro);
-            ctx.rotate(anguloInicio + arco / 2);
-            ctx.textAlign = "right";
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 11px sans-serif";
-            ctx.shadowColor = "rgba(0,0,0,0.6)";
-            ctx.shadowBlur = 3;
-
-            const nombre = participantes[i];
-            const balas = " •".repeat(impactos[nombre] || 0);
-            ctx.fillText(nombre + balas, radio - 10, 4);
+            ctx.rotate(startAng + sectorAngulo / 2);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 4;
+            ctx.fillText(nom, radio - 20, 6);
             ctx.restore();
         }
+
+        // 2. Borde exterior de la ruleta
+        ctx.beginPath();
+        ctx.arc(centro, centro, radio, 0, Math.PI * 2);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#dc3545';
+        ctx.stroke();
+
+        // 3. CEREBRO EN EL CÍRCULO CENTRAL
+        const radioCerebro = radio * 0.35;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centro, centro, radioCerebro, 0, Math.PI * 2);
+        ctx.fillStyle = '#0f1420';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = totalVivos > 2 ? '#00ffff' : '#6c757d';
+        ctx.stroke();
+
+        // Icono de Cerebro
+        ctx.font = `${radioCerebro * 0.8}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🧠', centro, centro);
+        ctx.restore();
     }
 
-    function actualizarUI() {
-        document.getElementById('totalConectados').innerText = participantes.length;
-        const contenedor = document.getElementById('listaNombres');
-        contenedor.innerHTML = participantes.map(n => {
-            const count = impactos[n] || 0;
-            const marcas = " •".repeat(count);
-            let badgeClass = n.includes("Cerebro") ? 'bg-dark' : 'bg-secondary';
-            if (count === 3) badgeClass = 'bg-danger';
-            return `<span class="badge ${badgeClass} p-1 px-2" style="font-size:0.75rem;">${n}${marcas}</span>`;
+    function renderizarListaJugadores() {
+        const cont = document.getElementById('listaJugadores');
+        if (!cont) return;
+
+        cont.innerHTML = participantes.map(nom => {
+            const d = jugadoresData[nom] || { vidas: 3, eliminado: false };
+            const esMuerto = d.eliminado || d.vidas <= 0;
+            const badgeClass = esMuerto ? "bg-secondary text-decoration-line-through opacity-50" : "bg-dark border border-secondary";
+            const corazones = esMuerto ? "⚰️" : "❤️".repeat(d.vidas);
+            const tagImpostor = (nom === miNombre && soyImpostor) ? " <span class='badge bg-warning text-dark'>Tú eres el Impostor</span>" : "";
+
+            return `<span class="badge ${badgeClass} p-2">${nom}: ${corazones}${tagImpostor}</span>`;
         }).join('');
-        dibujarRuleta();
     }
 
-    // 5. El anfitrión gira la ruleta
-    async function lanzarGiro() {
-        if (girando || enEsperaDecision || juegoTerminado) return;
+    // ========================================================
+    // FLUJO PRINCIPAL Y CEREBRO
+    // ========================================================
+    function iniciarPartida() {
         if (participantes.length < 2) {
-            alert("Se necesitan al menos 2 participantes para jugar.");
-            return;
-        }
-        if (tiroActual >= 12) {
-            alert("El tambor está vacío. Debes reiniciar.");
+            alert("Se requieren al menos 2 participantes.");
             return;
         }
 
-        reproducirMusicaFondo();
+        // Selección secreta del impostor
+        const idxImpostor = Math.floor(Math.random() * participantes.length);
+        nombreImpostor = participantes[idxImpostor];
 
-        if (!partidaEnCurso) {
-            await client.from('estado_ruleta').update({ en_curso: true }).eq('id', 1);
-        }
-        bloquearFormularioIngreso();
-
-        document.getElementById('alertaResultado').classList.add('d-none');
-
-        const n = participantes.length;
-        const arco = (2 * Math.PI) / n;
-
-        const vueltasCompletas = Math.floor(Math.random() * 4 + 6) * n;
-        const pasosExtras = Math.floor(Math.random() * n);
-        const totalGiro = (vueltasCompletas + pasosExtras) * arco;
-
-        const delta = ((Math.PI - (anguloActual + totalGiro)) % (2 * Math.PI) + (2 * Math.PI)) % (2 * Math.PI);
-        const idxApuntado = Math.floor((delta + arco / 2) / arco) % n;
-        const jugadorApuntado = participantes[idxApuntado];
-
-        canal.send({
-            type: 'broadcast',
-            event: 'girar_inicial',
-            payload: {
-                totalGiro: totalGiro,
-                jugadorApuntado: jugadorApuntado
-            }
+        participantes.forEach(nom => {
+            jugadoresData[nom].vidas = 3;
+            jugadoresData[nom].eliminado = false;
+            jugadoresData[nom].esImpostor = (nom === nombreImpostor);
         });
 
-        ejecutarAnimacionGiro(totalGiro, jugadorApuntado);
+        const payload = {
+            participantes,
+            jugadoresData,
+            nombreImpostor
+        };
+
+        canal.send({ type: 'broadcast', event: 'iniciar_partida', payload });
+        recibirInicioPartida(payload);
     }
 
-    // 6. Animación del giro inicial
-    function ejecutarAnimacionGiro(totalGiro, jugadorApuntado) {
-        if (girando) return;
-        girando = true;
-        enEsperaDecision = true;
-        jugadorApuntadoActual = jugadorApuntado;
+    function recibirInicioPartida(data) {
+        partidaEnCurso = true;
+        participantes = data.participantes;
+        jugadoresData = data.jugadoresData;
+        nombreImpostor = data.nombreImpostor;
 
-        const duracion = 4500;
-        const inicio = performance.now();
-        const anguloInicial = anguloActual;
+        soyImpostor = (miNombre === nombreImpostor);
 
-        function animar(ahora) {
-            const tiempo = Math.min((ahora - inicio) / duracion, 1);
-            const progreso = 1 - Math.pow(1 - tiempo, 3);
-            anguloActual = anguloInicial + totalGiro * progreso;
-            dibujarRuleta();
+        document.getElementById('bloqueRegistro').classList.add('d-none');
+        document.getElementById('btnIniciarAdmin').disabled = true;
 
-            if (tiempo < 1) {
-                requestAnimationFrame(animar);
-            } else {
-                girando = false;
-                evaluarTurnoDecision();
-            }
+        if (soyImpostor) {
+            document.getElementById('panelImpostor').classList.remove('d-none');
         }
-        requestAnimationFrame(animar);
+
+        const snd = document.getElementById('sndFondo');
+        if (snd) { snd.currentTime = 0; snd.play().catch(() => {}); }
+
+        renderizarTodo();
+
+        if (esAdmin) {
+            setTimeout(turnoDelJuego, 1500);
+        }
     }
 
-    // 7. Evaluar decisión (Humano o IA Gemini)
-    async function evaluarTurnoDecision() {
-        const cartel = document.getElementById('alertaResultado');
-        cartel.classList.remove('d-none');
-        cartel.className = "alert alert-warning mt-2 fw-bold fs-6 shadow-sm py-2";
+    function turnoDelJuego() {
+        if (!partidaEnCurso) return;
+        const vivos = obtenerSobrevivientes();
 
-        const btnG = document.getElementById('btnGirar');
-        if (btnG) btnG.disabled = true;
-
-        // CASO 1: La pistola apunta a Cerebro -> Suena freezer.mp3 y consulta a Gemini
-        if (jugadorApuntadoActual.includes("Cerebro")) {
-            cartel.innerHTML = `🤖 La pistola apunta a Cerebro. Pensando jugada...`;
-
-            const sndFreezer = document.getElementById('sndFreezer');
-            if (sndFreezer) {
-                sndFreezer.currentTime = 0;
-                sndFreezer.play().catch(e => console.log("Audio freezer bloqueado:", e));
-            }
-            
-            if (esAdmin) {
-                try {
-                    const idxCerebro = participantes.indexOf(jugadorApuntadoActual);
-                    const resp = await fetch('/api/bot-decision', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            comodines: comodinesCerebro,
-                            jugadores: participantes,
-                            impactos: impactos,
-                            idx_cerebro: idxCerebro
-                        })
-                    });
-                    const resJson = await resp.json();
-                    
-                    if (resJson.decision !== 'disparo') {
-                        comodinesCerebro[resJson.decision] = false;
-                    }
-
-                    const procesarJugada = () => {
-                        ejecutarDecisionBot(resJson.decision, resJson.razon);
-                    };
-
-                    if (sndFreezer && !sndFreezer.paused && !sndFreezer.ended) {
-                        sndFreezer.onended = () => {
-                            sndFreezer.onended = null;
-                            procesarJugada();
-                        };
-                    } else {
-                        procesarJugada();
-                    }
-
-                } catch (e) {
-                    console.error("Error consultando bot:", e);
-                    tomarDecision('disparo');
-                }
-            }
+        if (vivos.length <= 1) {
+            evaluarGanadorFinal();
             return;
         }
 
-        // CASO 2: La pistola apunta a un jugador humano (Activar temporizador de 10s)
-        cartel.innerHTML = `⚠️ Pistola apuntando a <span class="text-decoration-underline">${jugadorApuntadoActual}</span>. Decidiendo...`;
-        
-        if (miNombre === jugadorApuntadoActual) {
-            activarPanelVertical();
-            iniciarTemporizadorDecision();
-        } else {
-            desactivarPanelVertical();
+        // CASO A: Solo quedan 2 jugadores -> Ruleta Rusa Directa (Cerebro ya no opera)
+        if (vivos.length === 2) {
+            document.getElementById('txtEstado').innerText = "💀 Duelo Final: ¡Solo quedan 2! La ruleta rusa gira directamente.";
+            canal.send({ type: 'broadcast', event: 'aviso_global', payload: { texto: "💀 Duelo Final: ¡Ruleta directa para los 2 sobrevivientes!" } });
+            setTimeout(() => ejecutarTiroRuletaDirecta(vivos), 2000);
+            return;
+        }
+
+        // CASO B: Hay más de 2 jugadores -> Cerebro selecciona a 2 contrincantes
+        document.getElementById('txtEstado').innerText = "🧠 Cerebro está eligiendo a dos víctimas para el duelo...";
+
+        const copia = [...vivos];
+        const p1 = copia.splice(Math.floor(Math.random() * copia.length), 1)[0];
+        const p2 = copia.splice(Math.floor(Math.random() * copia.length), 1)[0];
+
+        const payloadDuelo = { p1, p2 };
+        canal.send({ type: 'broadcast', event: 'iniciar_duelo', payload: payloadDuelo });
+        recibirIniciarDuelo(payloadDuelo);
+    }
+
+    // ========================================================
+    // DUELO 2 VS 2 (ENDGAME)
+    // ========================================================
+    function recibirIniciarDuelo(data) {
+        dueloActivo = data;
+        decisionesDuelo = {};
+        miEleccionPos = null;
+        miEleccionDisp = null;
+
+        document.getElementById('txtEstado').innerText = `⚔️ Duelo elegido por Cerebro: ${data.p1} VS ${data.p2}`;
+
+        // Si este cliente es participante del duelo, despliega el modal
+        if (miNombre === data.p1 || miNombre === data.p2) {
+            const rival = (miNombre === data.p1) ? data.p2 : data.p1;
+            document.getElementById('lblDueloRival').innerText = rival;
+            document.getElementById('dueloEsperando').classList.add('d-none');
+
+            // Resetear botones
+            ['btnPos1', 'btnPos2', 'btnDisp1', 'btnDisp2'].forEach(id => {
+                const b = document.getElementById(id);
+                b.disabled = false;
+                b.classList.remove('btn-info', 'btn-danger');
+                if (id.startsWith('btnPos')) b.classList.add('btn-outline-info');
+                else b.classList.add('btn-outline-danger');
+            });
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDuelo'));
+            modal.show();
+
+            // Temporizador de 10s para decidir
+            iniciarTimerDuelo(10);
         }
     }
 
-    function iniciarTemporizadorDecision() {
-        detenerTemporizadorDecision();
-        tiempoRestante = 10;
-        
-        const badge = document.getElementById('badgeTemporizador');
-        const segs = document.getElementById('segundosRestantes');
-        if (badge && segs) {
-            segs.innerText = tiempoRestante;
-            badge.classList.remove('d-none');
+    function elegirPosicion(num) {
+        miEleccionPos = num;
+        document.getElementById('btnPos1').className = num === 1 ? 'btn btn-info px-4 fw-bold' : 'btn btn-outline-info px-4 fw-bold';
+        document.getElementById('btnPos2').className = num === 2 ? 'btn btn-info px-4 fw-bold' : 'btn btn-outline-info px-4 fw-bold';
+        verificarEnvioDecisionDuelo();
+    }
+
+    function elegirDisparo(num) {
+        miEleccionDisp = num;
+        document.getElementById('btnDisp1').className = num === 1 ? 'btn btn-danger px-4 fw-bold' : 'btn btn-outline-danger px-4 fw-bold';
+        document.getElementById('btnDisp2').className = num === 2 ? 'btn btn-danger px-4 fw-bold' : 'btn btn-outline-danger px-4 fw-bold';
+        verificarEnvioDecisionDuelo();
+    }
+
+    function verificarEnvioDecisionDuelo() {
+        if (miEleccionPos !== null && miEleccionDisp !== null) {
+            document.getElementById('dueloEsperando').classList.remove('d-none');
+            document.getElementById('btnPos1').disabled = true;
+            document.getElementById('btnPos2').disabled = true;
+            document.getElementById('btnDisp1').disabled = true;
+            document.getElementById('btnDisp2').disabled = true;
+
+            const decision = { jugador: miNombre, pos: miEleccionPos, disp: miEleccionDisp };
+            canal.send({ type: 'broadcast', event: 'decision_duelo', payload: decision });
+            recibirDecisionDuelo(decision);
         }
+    }
 
-        intervaloTimer = setInterval(() => {
-            tiempoRestante--;
-            if (segs) segs.innerText = tiempoRestante;
+    function recibirDecisionDuelo(data) {
+        decisionesDuelo[data.jugador] = { pos: data.pos, disp: data.disp };
 
-            if (tiempoRestante <= 0) {
-                detenerTemporizadorDecision();
-                tomarDecisionAleatoriaPorTiempo();
+        if (esAdmin && dueloActivo) {
+            // Si ambos jugadores enviaron su jugada
+            if (decisionesDuelo[dueloActivo.p1] && decisionesDuelo[dueloActivo.p2]) {
+                setTimeout(resolverDuelo, 1000);
+            }
+        }
+    }
+
+    function iniciarTimerDuelo(segundos) {
+        let t = segundos;
+        const lbl = document.getElementById('timerDuelo');
+        lbl.innerText = `${t}s`;
+        const interval = setInterval(() => {
+            t--;
+            lbl.innerText = `${t}s`;
+            if (t <= 0 || (miEleccionPos !== null && miEleccionDisp !== null)) {
+                clearInterval(interval);
+                // Si no eligió a tiempo, auto-asigna
+                if (miEleccionPos === null) elegirPosicion(Math.random() < 0.5 ? 1 : 2);
+                if (miEleccionDisp === null) elegirDisparo(Math.random() < 0.5 ? 1 : 2);
             }
         }, 1000);
     }
 
-    function detenerTemporizadorDecision() {
-        if (intervaloTimer) {
-            clearInterval(intervaloTimer);
-            intervaloTimer = null;
-        }
-        const badge = document.getElementById('badgeTemporizador');
-        if (badge) badge.classList.add('d-none');
-    }
+    function resolverDuelo() {
+        const p1 = dueloActivo.p1;
+        const p2 = dueloActivo.p2;
+        const d1 = decisionesDuelo[p1];
+        const d2 = decisionesDuelo[p2];
 
-    function tomarDecisionAleatoriaPorTiempo() {
-        const opciones = ['disparo'];
-        if (comodinesDisponibles.antihorario) opciones.push('antihorario');
-        if (comodinesDisponibles.horario) opciones.push('horario');
-        if (comodinesDisponibles.opuesto) opciones.push('opuesto');
+        // p1 dispara a d1.disp; impacta si d2.pos === d1.disp
+        const p2RecibeImpacto = (d2.pos === d1.disp);
+        // p2 dispara a d2.disp; impacta si d1.pos === d2.disp
+        const p1RecibeImpacto = (d1.pos === d2.disp);
 
-        const eleccionAzar = opciones[Math.floor(Math.random() * opciones.length)];
-        tomarDecision(eleccionAzar, true);
-    }
+        let textoResultado = "";
 
-    function activarPanelVertical() {
-        const panel = document.getElementById('panelTurnoAccion');
-        panel.classList.remove('opacity-25');
-        panel.style.pointerEvents = 'auto';
-
-        document.getElementById('btnAntihorario').style.display = comodinesDisponibles.antihorario ? 'inline-block' : 'none';
-        document.getElementById('btnHorario').style.display = comodinesDisponibles.horario ? 'inline-block' : 'none';
-        document.getElementById('btnOpuesto').style.display = comodinesDisponibles.opuesto ? 'inline-block' : 'none';
-    }
-
-    function desactivarPanelVertical() {
-        detenerTemporizadorDecision();
-        const panel = document.getElementById('panelTurnoAccion');
-        panel.classList.add('opacity-25');
-        panel.style.pointerEvents = 'none';
-    }
-
-    // 8. Decisión tomada por un Humano
-    function tomarDecision(tipo, porTiempo = false) {
-        detenerTemporizadorDecision();
-        desactivarPanelVertical();
-
-        const n = participantes.length;
-        const arco = (2 * Math.PI) / n;
-        let giroModificador = 0;
-
-        if (tipo === 'antihorario') {
-            comodinesDisponibles.antihorario = false;
-            giroModificador = -arco;
-        } else if (tipo === 'horario') {
-            comodinesDisponibles.horario = false;
-            giroModificador = arco;
-        } else if (tipo === 'opuesto') {
-            comodinesDisponibles.opuesto = false;
-            giroModificador = Math.PI;
+        if (p1RecibeImpacto && p2RecibeImpacto) {
+            jugadoresData[p1].vidas--;
+            jugadoresData[p2].vidas--;
+            textoResultado = `💥 ¡Fuego cruzado! Ambos acertaron: ${p1} (-1❤️) y ${p2} (-1❤️).`;
+        } else if (p1RecibeImpacto) {
+            jugadoresData[p1].vidas--;
+            textoResultado = `🎯 ¡${p2} acertó el búnker de ${p1}! ${p1} pierde 1❤️.`;
+        } else if (p2RecibeImpacto) {
+            jugadoresData[p2].vidas--;
+            textoResultado = `🎯 ¡${p1} acertó el búnker de ${p2}! ${p2} pierde 1❤️.`;
+        } else {
+            textoResultado = `💨 ¡Ambos dispararon a búnkers vacíos! Nadie recibe daño.`;
         }
 
-        const esBalaReal = tambor[tiroActual];
-        const razonTexto = porTiempo ? "Tiempo agotado (10s)" : "";
+        reproducirSonido('sndDisparo');
 
-        canal.send({
-            type: 'broadcast',
-            event: 'ejecutar_decision',
-            payload: {
-                tipo: tipo,
-                giroModificador: giroModificador,
-                jugadorOrigen: jugadorApuntadoActual,
-                esBalaReal: esBalaReal,
-                razon: razonTexto
+        // Chequeo de bajas
+        [p1, p2].forEach(p => {
+            if (jugadoresData[p].vidas <= 0) {
+                jugadoresData[p].eliminado = true;
+                textoResultado += ` ⚰️ ${p} ha sido eliminado.`;
             }
         });
 
-        aplicarDecisionGlobal({
-            tipo: tipo,
-            giroModificador: giroModificador,
-            jugadorOrigen: jugadorApuntadoActual,
-            esBalaReal: esBalaReal,
-            razon: razonTexto
-        });
+        // Sincronizar y cerrar modales
+        sincronizarEstado(textoResultado);
+
+        setTimeout(() => {
+            if (verificarFinPorImpostor()) return;
+            turnoDelJuego();
+        }, 3000);
     }
 
-    // 8.B Decisión tomada por Gemini para el Bot
-    function ejecutarDecisionBot(tipo, razon) {
-        const n = participantes.length;
-        const arco = (2 * Math.PI) / n;
-        let giroModificador = 0;
+    // ========================================================
+    // EVASIÓN DEL IMPOSTOR Y GIRO DE RULETA
+    // ========================================================
+    function evadirComoImpostor() {
+        if (!partidaEnCurso || girando) return;
 
-        if (tipo === 'antihorario') giroModificador = -arco;
-        else if (tipo === 'horario') giroModificador = arco;
-        else if (tipo === 'opuesto') giroModificador = Math.PI;
+        const vivos = obtenerSobrevivientes();
+        const n = vivos.length;
+        if (n <= 1) return;
 
-        const esBalaReal = tambor[tiroActual];
+        document.getElementById('panelImpostor').classList.add('d-none');
 
-        canal.send({
-            type: 'broadcast',
-            event: 'ejecutar_decision',
-            payload: {
-                tipo: tipo,
-                giroModificador: giroModificador,
-                jugadorOrigen: "Cerebro",
-                esBalaReal: esBalaReal,
-                razon: razon
+        // La ruleta gira un múltiplo aleatorio de 360/n
+        const anguloSector = 360 / n;
+        // 50% de probabilidad de caer en sector y 50% en raya divisoria
+        const caerEnRaya = Math.random() < 0.5;
+
+        // k vueltas completas (múltiplo de n) + desplazamiento
+        const vueltasCompletas = (Math.floor(Math.random() * 3) + 3) * 360;
+        const indiceAleatorio = Math.floor(Math.random() * n);
+
+        let gradosFinales = vueltasCompletas + (indiceAleatorio * anguloSector);
+        if (!caerEnRaya) {
+            gradosFinales += (anguloSector / 2); // Cae en el centro del sector
+        }
+
+        const payloadGiro = {
+            gradosGiro: gradosFinales,
+            resultado: {
+                caerEnRaya: caerEnRaya,
+                jugadorApuntado: vivos[indiceAleatorio],
+                jugadoresRaya: [vivos[indiceAleatorio], vivos[(indiceAleatorio + 1) % n]]
             }
-        });
+        };
 
-        aplicarDecisionGlobal({
-            tipo: tipo,
-            giroModificador: giroModificador,
-            jugadorOrigen: "Cerebro",
-            esBalaReal: esBalaReal,
-            razon: razon
-        });
+        canal.send({ type: 'broadcast', event: 'girar_ruleta_impostor', payload: payloadGiro });
+        animarGiroRuleta(payloadGiro.gradosGiro, payloadGiro.resultado);
     }
 
-    // 9. Aplicar animación de comodín y disparar
-    function aplicarDecisionGlobal(data) {
-        detenerTemporizadorDecision();
+    function animarGiroRuleta(gradosTotal, resultado) {
+        girando = true;
+        document.getElementById('txtEstado').innerText = "⚠️ ¡Un IMPOSTOR ha evadido la contienda! La pistola gira en la Ruleta...";
 
-        if (data.giroModificador !== 0) {
-            const duracion = 1200;
-            const inicio = performance.now();
-            const anguloInicial = anguloActual;
-            const target = data.giroModificador;
+        // Cierra modales abiertos si los hubiera
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
+        if (modal) modal.hide();
 
-            function animarAjuste(ahora) {
-                const t = Math.min((ahora - inicio) / duracion, 1);
-                const p = 1 - Math.pow(1 - t, 2);
-                anguloActual = anguloInicial + target * p;
-                dibujarRuleta();
+        const duracion = 4000;
+        const inicioTiempo = performance.now();
+        const anguloInicial = anguloActual;
+        const radianesGiro = (gradosTotal * Math.PI) / 180;
 
-                if (t < 1) {
-                    requestAnimationFrame(animarAjuste);
-                } else {
-                    ejecutarDisparoFinal(data);
+        function step(now) {
+            const elapsed = now - inicioTiempo;
+            const progress = Math.min(elapsed / duracion, 1);
+            // Curva de frenado suave easeOutCubic
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+
+            anguloActual = anguloInicial + (radianesGiro * easeOut);
+            dibujarRuleta();
+
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            } else {
+                girando = false;
+                procesarResultadoRuleta(resultado);
+            }
+        }
+
+        requestAnimationFrame(step);
+    }
+
+    function procesarResultadoRuleta(res) {
+        if (!esAdmin) return;
+
+        // CASO 1: Cayó en Raya Divisoria -> Duelo inmediato entre los 2 colindantes
+        if (res.caerEnRaya) {
+            const [p1, p2] = res.jugadoresRaya;
+            const msg = `⚡ ¡La aguja cayó en la RAYA divisoria! Duelo forzado entre ${p1} y ${p2}.`;
+            sincronizarEstado(msg);
+
+            setTimeout(() => {
+                const payloadDuelo = { p1, p2 };
+                canal.send({ type: 'broadcast', event: 'iniciar_duelo', payload: payloadDuelo });
+                recibirIniciarDuelo(payloadDuelo);
+            }, 2500);
+        }
+        // CASO 2: Cayó en un Jugador -> Disparo de la pistola (10 de 12 probabilidad de bala)
+        else {
+            const victima = res.jugadorApuntado;
+            // 10 balas en 12 recámaras
+            const hayBala = Math.random() < (10 / 12);
+
+            let msg = `🎯 La pistola apunta a ${victima}... *¡CLICK!* `;
+            if (hayBala) {
+                reproducirSonido('sndDisparo');
+                jugadoresData[victima].vidas--;
+                msg += `💥 ¡BANG! Había bala en el cartucho. ${victima} pierde 1❤️.`;
+                if (jugadoresData[victima].vidas <= 0) {
+                    jugadoresData[victima].eliminado = true;
+                    msg += ` ⚰️ ${victima} ha muerto.`;
                 }
+            } else {
+                reproducirSonido('sndClick');
+                msg += `💨 ¡Recámara vacía! ${victima} se ha salvado milagrosamente.`;
             }
-            requestAnimationFrame(animarAjuste);
-        } else {
-            ejecutarDisparoFinal(data);
+
+            sincronizarEstado(msg);
+
+            setTimeout(() => {
+                if (verificarFinPorImpostor()) return;
+                turnoDelJuego();
+            }, 3000);
         }
     }
 
-    // 10. Disparo y resolución de impactos
-    function ejecutarDisparoFinal(data) {
-        const n = participantes.length;
-        const arco = (2 * Math.PI) / n;
+    // ========================================================
+    // RULETA DIRECTA FINAL (CUANDO QUEDAN 2 JUGADORES)
+    // ========================================================
+    function ejecutarTiroRuletaDirecta(vivos) {
+        if (!esAdmin) return;
 
-        const delta = ((Math.PI - anguloActual) % (2 * Math.PI) + (2 * Math.PI)) % (2 * Math.PI);
-        const idx = Math.floor((delta + arco / 2) / arco) % n;
-        const afectado = participantes[idx];
+        // En ruleta directa, gira hacia uno de los 2
+        const elegido = vivos[Math.floor(Math.random() * vivos.length)];
+        const anguloGiro = (Math.floor(Math.random() * 4) + 4) * 360 + (vivos.indexOf(elegido) * 180) + 90;
 
-        tiroActual++;
-        actualizarMarcadorTambor();
-
-        const sndDisparo = document.getElementById('sndDisparo');
-        const sndVacio = document.getElementById('sndVacio');
-
-        if (data.esBalaReal) {
-            if (sndDisparo) { sndDisparo.currentTime = 0; sndDisparo.play().catch(() => {}); }
-            impactos[afectado] = (impactos[afectado] || 0) + 1;
-        } else {
-            if (sndVacio) { sndVacio.currentTime = 0; sndVacio.play().catch(() => {}); }
-        }
-
-        dibujarRuleta();
-        actualizarUI();
-
-        const cantBalas = impactos[afectado] || 0;
-        const cartel = document.getElementById('alertaResultado');
-        cartel.classList.remove('d-none');
-
-        let detalle = "";
-        if (data.tipo !== 'disparo') {
-            const icono = data.tipo === 'antihorario' ? '🔄' : (data.tipo === 'horario' ? '🔃' : '↔️');
-            detalle = ` (${data.jugadorOrigen} usó ${icono} ${data.tipo})`;
-            if (data.razon) detalle += ` [${data.razon}]`;
-        }
-
-        if (data.esBalaReal) {
-            cartel.className = "alert alert-danger mt-2 fw-bold fs-6 shadow-sm py-2";
-            cartel.innerHTML = `💥 ¡DISPARO REAL! <span class="text-decoration-underline">${afectado}</span> recibe bala (${cantBalas}/3)${detalle}.`;
-
-            if (cantBalas >= 3) {
-                juegoTerminado = true;
-                const textoFinal = obtenerTextoGanador();
-                cartel.innerHTML = `☠️ FIN DEL JUEGO: <span class="text-decoration-underline">${afectado}</span> ha sido ELIMINADO.${textoFinal}`;bloquearBoton();
-                return;
+        const payloadGiro = {
+            gradosGiro: anguloGiro,
+            resultado: {
+                caerEnRaya: false,
+                jugadorApuntado: elegido
             }
-        } else {
-            cartel.className = "alert alert-success mt-2 fw-bold fs-6 shadow-sm py-2";
-            cartel.innerHTML = `💨 *CLICK* ¡Recámara vacía! <span class="text-decoration-underline">${afectado}</span> se salvó${detalle}.`;
-        }
+        };
 
-        if (tiroActual >= 12 && !juegoTerminado) {
-            juegoTerminado = true;
-            cartel.className = "alert alert-warning mt-2 fw-bold fs-6 shadow-sm py-2";
-            const textoFinal = obtenerTextoGanador();
-            cartel.innerHTML = `🏁 ¡FIN DEL JUEGO! Se agotaron los 12 tiros.${textoFinal}`;
-            bloquearBoton();
-            return;
-        }
-
-        enEsperaDecision = false;
-        const btnG = document.getElementById('btnGirar');
-        if (btnG && !juegoTerminado) btnG.disabled = false;
+        canal.send({ type: 'broadcast', event: 'girar_ruleta_impostor', payload: payloadGiro });
+        animarGiroRuleta(payloadGiro.gradosGiro, payloadGiro.resultado);
     }
 
-    function bloquearBoton() {
-        const btn = document.getElementById('btnGirar');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = "⛔ JUEGO TERMINADO";
+    // ========================================================
+    // SINCRONIZACIÓN Y FIN DE PARTIDA
+    // ========================================================
+    function sincronizarEstado(textoAviso) {
+        renderizarTodo();
+        if (textoAviso) {
+            document.getElementById('txtEstado').innerText = textoAviso;
+            canal.send({ type: 'broadcast', event: 'aviso_global', payload: { texto: textoAviso } });
         }
+
+        canal.send({
+            type: 'broadcast',
+            event: 'sincronizar_estado',
+            payload: {
+                jugadoresData,
+                anguloActual
+            }
+        });
+    }
+
+    function recibirSincronizacion(p) {
+        jugadoresData = p.jugadoresData || jugadoresData;
+        anguloActual = p.anguloActual || anguloActual;
+
+        // Cerrar modal de duelo si ya se resolvió
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
+        if (modal) modal.hide();
+
+        renderizarTodo();
+    }
+
+    function verificarFinPorImpostor() {
+        if (nombreImpostor && jugadoresData[nombreImpostor]?.vidas <= 0) {
+            const payloadFin = {
+                titulo: "💀 EL IMPOSTOR HA CAÍDO",
+                subtitulo: `El impostor (${nombreImpostor}) ha perdido sus 3 corazones. El juego de Cerebro ha terminado.`,
+                jugadoresDataFinal: JSON.parse(JSON.stringify(jugadoresData))
+            };
+            canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
+            recibirFinPartida(payloadFin);
+            return true;
+        }
+        return false;
+    }
+
+    function evaluarGanadorFinal() {
+        const vivos = obtenerSobrevivientes();
+        let tit = "FIN DEL JUEGO";
+        let sub = "";
+
+        if (vivos.length === 1) {
+            tit = `👑 ¡${vivos[0]} ES EL ÚLTIMO SOBREVIVIENTE!`;
+            sub = `Ha sobrevivido a la ruleta y al juicio de Cerebro.`;
+        } else {
+            tit = "EMPATE TOTAL";
+            sub = "Todos los combatientes perecieron ante la ruleta.";
+        }
+
+        const payloadFin = { titulo: tit, subtitulo: sub, jugadoresDataFinal: JSON.parse(JSON.stringify(jugadoresData)) };
+        canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
+        recibirFinPartida(payloadFin);
+    }
+
+    function recibirFinPartida(payload) {
+        partidaEnCurso = false;
+        jugadoresData = payload.jugadoresDataFinal || jugadoresData;
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
+        if (modal) modal.hide();
+
+        document.getElementById('vicTitulo').innerText = payload.titulo;
+        document.getElementById('vicSubtitulo').innerText = payload.subtitulo;
+        document.getElementById('pantallaVictoria').classList.remove('d-none');
+        renderizarTodo();
+    }
+
+    function cerrarVictoria() {
+        document.getElementById('pantallaVictoria').classList.add('d-none');
+    }
+
+    async function reiniciarPartida() {
+        if (!confirm("¿Deseas reiniciar la ruleta?")) return;
+        await client.from('participantes_ruleta').delete().neq('id', 0);
+        canal.send({ type: 'broadcast', event: 'reiniciar', payload: {} });
+        resetearEstadoLocal();
     }
 
     function resetearEstadoLocal() {
-        inicializarTambor();
-        detenerTemporizadorDecision();
-        detenerMusicaFondo();
         partidaEnCurso = false;
-        anguloActual = 0;
+        estoyEliminado = false;
+        soyImpostor = false;
         miNombre = "";
-        
-        participantesBase = [];
+        nombreImpostor = "";
         participantes = [];
-        impactos = {};
-        
-        comodinesDisponibles = { antihorario: true, horario: true, opuesto: true };
-        comodinesCerebro = { antihorario: true, horario: true, opuesto: true };
-        
-        document.getElementById('alertaResultado').classList.add('d-none');
-        desactivarPanelVertical();
+        jugadoresData = {};
+        anguloActual = 0;
+        girando = false;
+        dueloActivo = null;
 
-        const sndFreezer = document.getElementById('sndFreezer');
-        if (sndFreezer) {
-            sndFreezer.pause();
-            sndFreezer.currentTime = 0;
-            sndFreezer.onended = null;
-        }
+        const snd = document.getElementById('sndFondo');
+        if (snd) { snd.pause(); snd.currentTime = 0; }
 
-        const input = document.getElementById('inputNombre');
-        const btnListo = document.getElementById('btnListo');
-        const msg = document.getElementById('msgConfirmacion');
-        if (input) {
-            input.disabled = false;
-            input.value = "";
-            input.placeholder = "Ej: Cristian";
-        }
-        if (btnListo) {
-            btnListo.disabled = false;
-            btnListo.innerText = "Listo ✅";
-        }
-        if (msg) {
-            msg.classList.add('d-none');
-        }
+        document.getElementById('bloqueRegistro').classList.remove('d-none');
+        document.getElementById('panelImpostor').classList.add('d-none');
+        document.getElementById('pantallaVictoria').classList.add('d-none');
+        document.getElementById('btnListo').disabled = false;
+        document.getElementById('inputNombre').disabled = false;
+        document.getElementById('inputNombre').value = "";
+        document.getElementById('msgConfirmacion').classList.add('d-none');
+        document.getElementById('btnIniciarAdmin').disabled = false;
+        document.getElementById('txtEstado').innerText = "Esperando participantes para la Ruleta...";
 
-        const btn = document.getElementById('btnGirar');
-        if (btn) {
-            btn.disabled = false;
-            btn.innerText = "🎰 GIRAR RULETA";
-        }
-        actualizarUI();
+        renderizarTodo();
     }
 
-    // 11. Reiniciar para todos y resetear la BD en Supabase
-    async function reiniciarRuleta() {
-        if (!confirm("¿Deseas reiniciar la partida para todos?")) return;
-
-        try {
-            await client.from('participantes_ruleta').delete().neq('id', 0);
-            await client.from('estado_ruleta').update({ en_curso: false }).eq('id', 1);
-
-            await canal.send({
-                type: 'broadcast',
-                event: 'reiniciar',
-                payload: {}
-            });
-
-            resetearEstadoLocal();
-
-        } catch (error) {
-            console.error("Error al reiniciar la partida:", error);
-            alert("Ocurrió un error al reiniciar la partida. Intenta nuevamente.");
-        }
-    }
-
-    // 12
-    function obtenerTextoGanador() {
-        if (participantes.length === 0) return "";
-
-        // Encontrar el menor número de impactos registrados
-        let menorImpactos = Infinity;
-        participantes.forEach(p => {
-            const balazos = impactos[p] || 0;
-            if (balazos < menorImpactos) {
-                menorImpactos = balazos;
-            }
-        });
-
-        // Filtrar todos los jugadores que tengan esa menor cantidad
-        const conMenosBalas = participantes.filter(p => (impactos[p] || 0) === menorImpactos);
-
-        // Si hay más de un jugador con la misma menor cantidad, hay empate
-        if (conMenosBalas.length > 1) {
-            return "<br><span class='fs-6 fw-normal'>🤝 EMPATE, NO HAY GANADORES</span>";
-        } else {
-            return `<br><span class='fs-6 fw-normal'>🗿 GANADOR SOBREVIVIENTE: <strong>${conMenosBalas[0]}</strong> (${menorImpactos} bala${menorImpactos === 1 ? '' : 's'})</span>`;
-        }
-    }
-    
-
-    inicializarTambor();
     cargarParticipantes();
-    cargarEstadoPartida();
 </script>
 {% endblock %}
