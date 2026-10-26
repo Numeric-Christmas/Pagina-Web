@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div id="pantallaJuego" class="container py-2 text-center no-select" style="max-width: 800px;">
+<div id="pantallaJuego" class="container py-2 text-center no-select" style="max-width: 820px;">
     <!-- Audios -->
     <audio id="sndFondo" preload="auto" loop src="{{ url_for('static', filename='audio/sound.mp3') }}"></audio>
     <audio id="sndDisparo" preload="auto" src="{{ url_for('static', filename='audio/disparo.mp3') }}"></audio>
@@ -9,11 +9,11 @@
     <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
     <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
 
-    <!-- CABECERA Y REGISTRO -->
+    <!-- BLOQUE REGISTRO -->
     <div id="bloqueRegistro">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <div style="width: 38px;"></div>
-            <h2 class="fw-bold text-light m-0 fs-4">🎡 Ruleta Rusa: El Juicio de Cerebro</h2>
+            <h2 class="fw-bold text-light m-0 fs-4">🎡 Ruleta Rusa: Agresor vs Defensor</h2>
             <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()">
                 🔊
             </button>
@@ -25,7 +25,7 @@
                 <button class="btn btn-danger px-3 fw-bold" id="btnListo" onclick="unirse()">Listo ✅</button>
             </div>
             <div id="msgConfirmacion" class="small text-success mt-1 d-none" style="font-size: 0.75rem;">
-                ¡Registrado! Esperando inicio de la ruleta.
+                ¡Registrado! Esperando inicio de la partida.
             </div>
         </div>
     </div>
@@ -34,7 +34,7 @@
     <div id="panelAdmin" class="mb-2 d-none">
         <div class="d-flex justify-content-center gap-2">
             <button id="btnIniciarAdmin" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="iniciarPartida()">
-                🚀 INICIAR RULETA
+                🚀 INICIAR PARTIDA
             </button>
             <button class="btn btn-outline-secondary btn-sm text-light" onclick="reiniciarPartida()">
                 🗑️ Reiniciar
@@ -42,79 +42,162 @@
         </div>
     </div>
 
-    <!-- ESTADO GLOBAL -->
-    <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold mb-2 shadow-sm text-warning">
-        <span id="txtEstado">Esperando participantes para la Ruleta...</span>
-    </div>
-
-    <!-- BOTÓN DE EVASIÓN PARA EL IMPOSTOR -->
-    <div id="panelImpostor" class="mb-2 d-none">
-        <button class="btn btn-warning btn-sm px-4 fw-bold shadow pulse-btn" onclick="evadirComoImpostor()">
-            🕵️ EVADIR DUELO (Pasa la pistola a la Ruleta)
-        </button>
-    </div>
-
-    <!-- CANVAS DE LA RULETA CON CEREBRO EN EL CENTRO -->
-    <div class="d-flex justify-content-center align-items-center my-2 position-relative">
-        <div class="canvas-container">
-            <div class="aguja-ruleta">🔻</div>
-            <canvas id="cvsRuleta" width="500" height="500"></canvas>
+    <!-- PANEL ESTADO Y TAMBOR DE BALAS -->
+    <div class="d-flex justify-content-between align-items-center mb-2 px-1 flex-wrap gap-2">
+        <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold m-0 text-warning text-start flex-grow-1">
+            <span id="txtEstado">Esperando participantes...</span>
+        </div>
+        <div class="badge bg-danger p-2 fs-6 shadow-sm">
+            🔫 Cartucho: <span id="lblCartuchos">12</span>/12
         </div>
     </div>
 
-    <!-- LISTA DE JUGADORES Y CORAZONES -->
+    <!-- CANVAS RULETA COMPACTA CON PISTOLA A LA DERECHA -->
+    <div class="d-flex justify-content-center align-items-center my-2 position-relative">
+        <div class="canvas-container-compacto">
+            <div class="pistola-apuntador-derecha">🔫</div>
+            <canvas id="cvsRuleta" width="460" height="460"></canvas>
+        </div>
+    </div>
+
+    <!-- LISTA DE COMBATIENTES -->
     <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start my-2">
         <span class="fw-bold small text-white text-uppercase d-block mb-1 border-bottom border-secondary pb-1" style="font-size: 0.8rem;">
-            Sobrevivientes en el Círculo
+            Combatientes en Juego
         </span>
         <div id="listaJugadores" class="d-flex flex-wrap gap-2 justify-content-center py-1"></div>
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- MODAL DE DUELO TÁCTICO 2 VS 2 (ENDGAME) -->
-<!-- ========================================== -->
-<div class="modal fade" id="modalDuelo" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-danger shadow-lg bg-dark text-light">
-            <div class="modal-header py-2 bg-danger text-white justify-content-between">
-                <h6 class="modal-title fw-bold m-0">⚔️ Duelo Táctico 2 vs 2: <span id="lblDueloRival"></span></h6>
-                <span id="timerDuelo" class="badge bg-dark border border-light">10s</span>
+<!-- MODAL: RETO OBLIGATORIO (Elegir Defensor o No Retar) -->
+<div class="modal fade" id="modalElegirRival" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-danger bg-dark text-light">
+            <div class="modal-header py-2 bg-danger text-white">
+                <h6 class="modal-title fw-bold m-0">🎯 ¡Tienes la Bala!</h6>
             </div>
             <div class="modal-body p-3 text-center">
-                <p id="lblInstruccionDuelo" class="small text-muted mb-2">
-                    Cerebro te ha emparejado para el sacrificio. Elige tu trinchera y a dónde disparas.
-                </p>
-
-                <!-- Selección de Búnker propio (Posición) -->
-                <div class="mb-3">
-                    <span class="small fw-bold text-info d-block mb-1">1. Elige tu Búnker de Posición:</span>
-                    <div class="d-flex justify-content-center gap-3">
-                        <button type="button" id="btnPos1" class="btn btn-outline-info px-4 fw-bold" onclick="elegirPosicion(1)">Búnker 1</button>
-                        <button type="button" id="btnPos2" class="btn btn-outline-info px-4 fw-bold" onclick="elegirPosicion(2)">Búnker 2</button>
-                    </div>
-                </div>
-
-                <!-- Selección de Disparo al Rival -->
-                <div>
-                    <span class="small fw-bold text-danger d-block mb-1">2. Elige a qué Búnker Rival disparas:</span>
-                    <div class="d-flex justify-content-center gap-3">
-                        <button type="button" id="btnDisp1" class="btn btn-outline-danger px-4 fw-bold" onclick="elegirDisparo(1)">Disparar a 1</button>
-                        <button type="button" id="btnDisp2" class="btn btn-outline-danger px-4 fw-bold" onclick="elegirDisparo(2)">Disparar a 2</button>
-                    </div>
-                </div>
-
-                <div id="dueloEsperando" class="small text-warning mt-3 d-none">
-                    Decisiones tomadas. Esperando la resolución de Cerebro...
+                <p class="small text-light mb-2">Recibiste la bala. Elige a tu <strong>Defensor</strong>:</p>
+                <div id="contenedorBotonesRivales" class="d-grid gap-2 mb-2"></div>
+                <div class="border-top border-secondary pt-2">
+                    <button class="btn btn-outline-warning btn-sm w-100 fw-bold" onclick="optarPorNoRetar()">
+                        No deseo retar a nadie 🏳️
+                    </button>
+                    <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">
+                        * Tu nombre pasará a tener 2 porciones y girará la ruleta.
+                    </small>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- PANTALLA CINEMÁTICA DE FIN DE PARTIDA -->
-<!-- ========================================== -->
+<!-- MODAL: DEFENSOR RESPONDE RETO -->
+<div class="modal fade" id="modalResponderReto" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-warning bg-dark text-light">
+            <div class="modal-header py-2 bg-warning text-dark">
+                <h6 class="modal-title fw-bold m-0">⚔️ Desafío de Agresión</h6>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <p class="small text-light mb-2">
+                    El Agresor <strong id="lblAgresorNombre" class="text-danger"></strong> te ha seleccionado como Defensor.
+                </p>
+                <div class="small text-muted mb-3" style="font-size: 0.72rem;">
+                    * Si aceptas y pierdes, tendrás un total de <strong>3 porciones</strong>.<br>
+                    * Si ambos aciertan, ambos tendrán un total de <strong>2 porciones</strong>.<br>
+                    * Si rechazas, tendrás un total de <strong>2 porciones</strong> de inmediato.
+                </div>
+                <div class="d-flex justify-content-center gap-2">
+                    <button class="btn btn-success btn-sm px-3 fw-bold" onclick="responderReto(true)">Aceptar ⚔️</button>
+                    <button class="btn btn-outline-secondary btn-sm px-3 text-light" onclick="responderReto(false)">Rechazar 🏃</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ARENA TÁCTICA AGRESOR VS DEFENSOR (COLUMNAS JUNTAS) -->
+<div class="modal fade" id="modalDueloTactico" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content arena-tactica-modal shadow-lg">
+            <div class="modal-body p-3 p-md-4 text-center">
+                <!-- ENCABEZADO -->
+                <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-1">
+                    <h1 id="lblAgresorTitulo" class="fw-bold m-0 text-danger text-uppercase fs-2">AGRESOR</h1>
+                    <span class="fs-2 text-warning">⚡</span>
+                    <h2 class="fw-bold m-0 text-warning fs-3">VS</h2>
+                    <span class="fs-2 text-warning">⚡</span>
+                    <h1 id="lblDefensorTitulo" class="fw-bold m-0 text-primary text-uppercase fs-2">DEFENSOR</h1>
+                </div>
+
+                <p id="lblInstruccionDuelo" class="text-light-emphasis small mb-2" style="font-size: 0.85rem;">
+                    Haz clic en tu columna para tu <strong>cobertura</strong> y en la columna rival para tu <strong>disparo 🔫</strong>
+                </p>
+
+                <div class="d-flex justify-content-center mb-3">
+                    <span id="badgeTimerDuelo" class="badge-reloj-duelo">5s</span>
+                </div>
+
+                <!-- CELDAS 2 VS 2 SIEMPRE LADO A LADO -->
+                <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2 mb-3">
+                    <!-- Columna 1: Agresor -->
+                    <div style="flex: 1; max-width: 320px;">
+                        <div class="card-bunker-duelo card-bunker-rojo">
+                            <div class="barra-header-bunker bg-danger">
+                                <span id="headerNombreAgresor" class="fw-bold text-white small text-uppercase">Agresor</span>
+                            </div>
+                            <div class="p-2 d-flex flex-column gap-2">
+                                <div id="celda_col1_1" class="celda-arena-fila" onclick="pulsarCeldaArena(1, 1)">
+                                    <span class="fila-lbl">Fila 1</span>
+                                    <div class="fila-contenido"></div>
+                                </div>
+                                <div id="celda_col1_2" class="celda-arena-fila" onclick="pulsarCeldaArena(1, 2)">
+                                    <span class="fila-lbl">Fila 2</span>
+                                    <div class="fila-contenido"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Espadas divisoras -->
+                    <div class="px-1 d-flex align-items-center justify-content-center" style="width: 40px;">
+                        <span class="icono-espadas-duelo">⚔️</span>
+                    </div>
+
+                    <!-- Columna 2: Defensor -->
+                    <div style="flex: 1; max-width: 320px;">
+                        <div class="card-bunker-duelo card-bunker-azul">
+                            <div class="barra-header-bunker bg-primary">
+                                <span id="headerNombreDefensor" class="fw-bold text-white small text-uppercase">Defensor</span>
+                            </div>
+                            <div class="p-2 d-flex flex-column gap-2">
+                                <div id="celda_col2_1" class="celda-arena-fila" onclick="pulsarCeldaArena(2, 1)">
+                                    <span class="fila-lbl">Fila 1</span>
+                                    <div class="fila-contenido"></div>
+                                </div>
+                                <div id="celda_col2_2" class="celda-arena-fila" onclick="pulsarCeldaArena(2, 2)">
+                                    <span class="fila-lbl">Fila 2</span>
+                                    <div class="fila-contenido"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="lblEstadoEleccionPersonal" class="small text-info mb-2 fw-bold"></div>
+
+                <!-- CUADRO RESULTADO (SINCRONIZADO PARA TODOS) -->
+                <div id="cuadroResultadoDuelo" class="cuadro-resultado-duelo d-none">
+                    <h5 id="resumenDueloTitulo" class="fw-bold text-warning mb-1"></h5>
+                    <div id="resumenDueloDetalle" class="small text-start px-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PANTALLA FIN DE PARTIDA -->
 <div id="pantallaVictoria" class="d-none no-select">
     <div class="victoria-content text-white text-center p-3">
         <h1 id="vicTitulo" class="display-4 fw-bold text-uppercase mb-2 text-danger"></h1>
@@ -143,10 +226,10 @@
         -webkit-user-select: none;
     }
 
-    .canvas-container {
+    .canvas-container-compacto {
         position: relative;
         width: 100%;
-        max-width: 440px;
+        max-width: 400px;
         aspect-ratio: 1 / 1;
         display: flex;
         justify-content: center;
@@ -157,26 +240,109 @@
         width: 100%;
         height: 100%;
         display: block;
-        filter: drop-shadow(0 6px 20px rgba(0,0,0,0.8));
+        filter: drop-shadow(0 6px 20px rgba(0,0,0,0.85));
     }
 
-    .aguja-ruleta {
+    .pistola-apuntador-derecha {
         position: absolute;
-        top: -12px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 2rem;
+        top: 50%;
+        right: -24px;
+        transform: translateY(-50%);
+        font-size: 2.2rem;
+        line-height: 1;
         z-index: 20;
         pointer-events: none;
-        filter: drop-shadow(0 2px 6px rgba(255, 0, 0, 0.8));
+        filter: drop-shadow(0 2px 8px rgba(220, 53, 69, 0.9));
     }
 
-    .pulse-btn {
-        animation: pulsoBtn 1.2s infinite alternate;
+    .arena-tactica-modal {
+        background-color: #0d1017 !important;
+        border: 2px solid #232a3b !important;
+        border-radius: 16px !important;
     }
-    @keyframes pulsoBtn {
-        from { transform: scale(1); box-shadow: 0 0 4px #ffc107; }
-        to { transform: scale(1.04); box-shadow: 0 0 16px #ffc107; }
+
+    .badge-reloj-duelo {
+        background-color: #dc3545;
+        color: #ffffff;
+        font-weight: 900;
+        font-size: 1.1rem;
+        padding: 4px 16px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(220, 53, 69, 0.6);
+    }
+
+    .card-bunker-duelo {
+        background-color: #121622;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #242c3d;
+    }
+    .card-bunker-rojo { border-color: rgba(220, 53, 69, 0.4); }
+    .card-bunker-azul { border-color: rgba(13, 110, 253, 0.4); }
+
+    .barra-header-bunker {
+        padding: 6px 12px;
+        text-align: center;
+        letter-spacing: 1px;
+    }
+
+    .celda-arena-fila {
+        background-color: #181d2a;
+        border: 2px dashed #283347;
+        border-radius: 8px;
+        padding: 8px 10px;
+        min-height: 52px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.15s ease;
+        cursor: pointer;
+    }
+    .celda-arena-fila:hover {
+        border-color: #0dcaf0;
+        background-color: #1d2535;
+    }
+
+    .celda-cobertura-propia {
+        border: 2px solid #00ffff !important;
+        background: #113344 !important;
+    }
+
+    .celda-disparo-objetivo {
+        border: 2px solid #dc3545 !important;
+        background: #3d1419 !important;
+    }
+
+    .fila-lbl {
+        font-weight: bold;
+        color: #ffffff;
+        font-size: 0.9rem;
+    }
+
+    .fila-contenido {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .badge-combatiente-arena {
+        font-weight: 700;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+
+    .icono-espadas-duelo {
+        font-size: 1.8rem;
+        filter: drop-shadow(0 0 6px rgba(255,255,255,0.3));
+    }
+
+    .cuadro-resultado-duelo {
+        border: 1.5px solid #ffc107;
+        background: #131720;
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: 0 0 14px rgba(255, 193, 7, 0.2);
     }
 
     #pantallaVictoria {
@@ -203,25 +369,26 @@
     let esAdmin = false;
     let partidaEnCurso = false;
     let estoyEliminado = false;
-    let soyImpostor = false;
 
-    let participantes = []; // Lista completa ordenada
-    let jugadoresData = {};  // { 'Cris': { vidas: 3, eliminado: false, esImpostor: false, color: '#...' } }
-    let nombreImpostor = "";
-
-    // Estado de la Ruleta
+    let participantes = [];
+    let jugadoresData = {}; 
+    let porciones = [];      
     let anguloActual = 0;
     let girando = false;
 
-    // Duelo en curso
-    let dueloActivo = null; // { p1: '...', p2: '...' }
-    let miEleccionPos = null;
-    let miEleccionDisp = null;
-    let decisionesDuelo = {}; // { 'Nombre': { pos, disp } }
+    let cartuchosRestantes = 12;
+    let tamborBalas = [];
+    let jugadorConBalaActual = null;
+    let afectadoConBalaImpacto = null;
 
-    const COLORES_PALETA = [
+    let dueloInfo = null;
+    let miEleccionDuelo = { pos: null, disp: null };
+    let eleccionesDuelo = {};
+    let dueloBloqueado = false;
+
+    const COLORES = [
         '#e63946', '#457b9d', '#2a9d8f', '#e76f51', '#9b5de5',
-        '#f15bb5', '#00bbf9', '#00f5d4', '#fee440', '#3a86ff'
+        '#f15bb5', '#00bbf9', '#00f5d4', '#fee440', '#3a86ff', '#e07a5f'
     ];
 
     function reproducirSonido(id) {
@@ -239,16 +406,38 @@
         btn.innerText = audio.muted ? "🔇" : "🔊";
     }
 
-    const canal = client.channel('sala-ruleta-cerebro');
+    function forzarCierreModalDuelo() {
+        const el = document.getElementById('modalDueloTactico');
+        if (el) {
+            const modal = bootstrap.Modal.getInstance(el);
+            if (modal) modal.hide();
+        }
+        const modalRetar = bootstrap.Modal.getInstance(document.getElementById('modalElegirRival'));
+        if (modalRetar) modalRetar.hide();
+        const modalResp = bootstrap.Modal.getInstance(document.getElementById('modalResponderReto'));
+        if (modalResp) modalResp.hide();
+
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
+    }
+
+    const canal = client.channel('sala-ruleta-2n');
 
     canal
         .on('postgres_changes', { event: '*', schema: 'public', table: 'participantes_ruleta' }, () => cargarParticipantes())
         .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
         .on('broadcast', { event: 'iniciar_partida' }, (p) => recibirInicioPartida(p.payload))
-        .on('broadcast', { event: 'sincronizar_estado' }, (p) => recibirSincronizacion(p.payload))
-        .on('broadcast', { event: 'iniciar_duelo' }, (p) => recibirIniciarDuelo(p.payload))
-        .on('broadcast', { event: 'decision_duelo' }, (p) => recibirDecisionDuelo(p.payload))
-        .on('broadcast', { event: 'girar_ruleta_impostor' }, (p) => animarGiroRuleta(p.payload.gradosGiro, p.payload.resultado))
+        .on('broadcast', { event: 'sincronizar_todo' }, (p) => recibirSincronizacion(p.payload))
+        .on('broadcast', { event: 'bala_marcada' }, (p) => recibirBalaMarcada(p.payload))
+        .on('broadcast', { event: 'propuesta_reto' }, (p) => recibirPropuestaReto(p.payload))
+        .on('broadcast', { event: 'no_retar' }, (p) => recibirNoRetar(p.payload))
+        .on('broadcast', { event: 'rechazo_reto' }, (p) => recibirRechazoReto(p.payload))
+        .on('broadcast', { event: 'iniciar_arena' }, (p) => recibirIniciarArena(p.payload))
+        .on('broadcast', { event: 'jugada_arena' }, (p) => recibirJugadaArena(p.payload))
+        .on('broadcast', { event: 'resultado_arena' }, (p) => recibirResultadoArena(p.payload))
+        .on('broadcast', { event: 'girar_disparo' }, (p) => animarGiroDisparo(p.payload))
         .on('broadcast', { event: 'fin_partida' }, (p) => recibirFinPartida(p.payload))
         .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
@@ -262,18 +451,22 @@
         if (!error && data) {
             participantes = data.map(d => d.nombre);
 
+            if (!participantes.includes("Cerebro")) {
+                participantes.push("Cerebro");
+            }
+
             participantes.forEach((nom, idx) => {
                 if (!jugadoresData[nom]) {
                     jugadoresData[nom] = {
                         vidas: 3,
                         eliminado: false,
-                        esImpostor: false,
-                        color: COLORES_PALETA[idx % COLORES_PALETA.length]
+                        color: nom === "Cerebro" ? '#9b5de5' : COLORES[idx % COLORES.length]
                     };
                 }
             });
 
-            renderizarTodo();
+            renderizarListaJugadores();
+            dibujarRuleta();
         }
     }
 
@@ -301,96 +494,103 @@
         }
     }
 
-    // ========================================================
-    // RENDERIZADO DE LA RULETA (CANVAS)
-    // ========================================================
-    function renderizarTodo() {
-        dibujarRuleta();
-        renderizarListaJugadores();
-    }
-
-    function obtenerSobrevivientes() {
+    function obtenerVivos() {
         return participantes.filter(nom => jugadoresData[nom] && !jugadoresData[nom].eliminado && jugadoresData[nom].vidas > 0);
     }
 
+    function reorganizarUnaPorcionPorJugador() {
+        const vivos = obtenerVivos();
+        const totalPorciones = 2 * vivos.length;
+        porciones = new Array(totalPorciones).fill(null);
+
+        const slotsLibres = Array.from({ length: totalPorciones }, (_, i) => i);
+        vivos.forEach(nom => {
+            const idx = Math.floor(Math.random() * slotsLibres.length);
+            const slot = slotsLibres.splice(idx, 1)[0];
+            porciones[slot] = nom;
+        });
+
+        const sectorAngulo = (Math.PI * 2) / totalPorciones;
+        anguloActual = -sectorAngulo / 2;
+    }
+
+    // ========================================================
+    // RENDERIZADO DE LA RULETA (CRUZANDO EL EJE X)
+    // ========================================================
     function dibujarRuleta() {
         const cvs = document.getElementById('cvsRuleta');
         if (!cvs) return;
         const ctx = cvs.getContext('2d');
         const centro = cvs.width / 2;
-        const radio = centro - 15;
+        const radio = centro - 22;
 
         ctx.clearRect(0, 0, cvs.width, cvs.height);
 
-        const vivos = obtenerSobrevivientes();
-        const totalVivos = vivos.length;
+        const totalPorciones = porciones.length || 6;
+        const sectorAngulo = (Math.PI * 2) / totalPorciones;
 
-        if (totalVivos === 0) {
-            // Fondo vacío si no hay participantes
-            ctx.fillStyle = '#161b26';
-            ctx.beginPath();
-            ctx.arc(centro, centro, radio, 0, Math.PI * 2);
-            ctx.fill();
-            return;
-        }
-
-        const sectorAngulo = (Math.PI * 2) / totalVivos;
-
-        // 1. Dibujar Sectores de Jugadores
-        for (let i = 0; i < totalVivos; i++) {
-            const nom = vivos[i];
+        for (let i = 0; i < totalPorciones; i++) {
             const startAng = anguloActual + (i * sectorAngulo);
             const endAng = startAng + sectorAngulo;
+            const ocupante = porciones[i];
 
             ctx.beginPath();
             ctx.moveTo(centro, centro);
             ctx.arc(centro, centro, radio, startAng, endAng);
             ctx.closePath();
-            ctx.fillStyle = jugadoresData[nom]?.color || '#333';
+
+            if (ocupante && jugadoresData[ocupante]) {
+                ctx.fillStyle = jugadoresData[ocupante].color;
+            } else {
+                ctx.fillStyle = (i % 2 === 0) ? '#161b26' : '#11151f';
+            }
             ctx.fill();
 
-            // Borde / Raya divisoria
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.strokeStyle = '#0b0d13';
             ctx.stroke();
 
-            // Texto con Nombre de Jugador
             ctx.save();
             ctx.translate(centro, centro);
             ctx.rotate(startAng + sectorAngulo / 2);
             ctx.textAlign = 'right';
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px sans-serif';
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
-            ctx.shadowBlur = 4;
-            ctx.fillText(nom, radio - 20, 6);
+
+            if (ocupante) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 15px sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 3;
+
+                let etiquetaTexto = ocupante;
+                if (ocupante === jugadorConBalaActual) {
+                    etiquetaTexto += " 💣";
+                }
+                if (ocupante === afectadoConBalaImpacto) {
+                    etiquetaTexto += " •";
+                }
+
+                ctx.fillText(etiquetaTexto, radio - 18, 5);
+            } else {
+                ctx.fillStyle = '#6c757d';
+                ctx.font = '13px sans-serif';
+                ctx.fillText(`[${i + 1}]`, radio - 20, 5);
+            }
             ctx.restore();
         }
 
-        // 2. Borde exterior de la ruleta
         ctx.beginPath();
         ctx.arc(centro, centro, radio, 0, Math.PI * 2);
         ctx.lineWidth = 6;
         ctx.strokeStyle = '#dc3545';
         ctx.stroke();
 
-        // 3. CEREBRO EN EL CÍRCULO CENTRAL
-        const radioCerebro = radio * 0.35;
-        ctx.save();
         ctx.beginPath();
-        ctx.arc(centro, centro, radioCerebro, 0, Math.PI * 2);
-        ctx.fillStyle = '#0f1420';
+        ctx.arc(centro, centro, 22, 0, Math.PI * 2);
+        ctx.fillStyle = '#0b0d13';
         ctx.fill();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = totalVivos > 2 ? '#00ffff' : '#6c757d';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#dc3545';
         ctx.stroke();
-
-        // Icono de Cerebro
-        ctx.font = `${radioCerebro * 0.8}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🧠', centro, centro);
-        ctx.restore();
     }
 
     function renderizarListaJugadores() {
@@ -399,38 +599,38 @@
 
         cont.innerHTML = participantes.map(nom => {
             const d = jugadoresData[nom] || { vidas: 3, eliminado: false };
-            const esMuerto = d.eliminado || d.vidas <= 0;
-            const badgeClass = esMuerto ? "bg-secondary text-decoration-line-through opacity-50" : "bg-dark border border-secondary";
-            const corazones = esMuerto ? "⚰️" : "❤️".repeat(d.vidas);
-            const tagImpostor = (nom === miNombre && soyImpostor) ? " <span class='badge bg-warning text-dark'>Tú eres el Impostor</span>" : "";
-
-            return `<span class="badge ${badgeClass} p-2">${nom}: ${corazones}${tagImpostor}</span>`;
+            const muerto = d.eliminado || d.vidas <= 0;
+            const badgeClass = muerto ? "bg-secondary text-decoration-line-through opacity-50" : "bg-dark border border-secondary";
+            const corazones = muerto ? "⚰️" : "❤️".repeat(d.vidas);
+            const tagBala = (nom === jugadorConBalaActual) ? " <span class='badge bg-warning text-dark'>💣 Agresor</span>" : "";
+            const tagImpacto = (nom === afectadoConBalaImpacto) ? " <span class='badge bg-danger'>• Herido</span>" : "";
+            return `<span class="badge ${badgeClass} p-2">${nom}: ${corazones}${tagBala}${tagImpacto}</span>`;
         }).join('');
     }
 
     // ========================================================
-    // FLUJO PRINCIPAL Y CEREBRO
+    // INICIO DE PARTIDA
     // ========================================================
     function iniciarPartida() {
-        if (participantes.length < 2) {
-            alert("Se requieren al menos 2 participantes.");
+        const vivos = obtenerVivos();
+        if (vivos.length < 2) {
+            alert("Se requieren al menos 2 combatientes (incluido Cerebro).");
             return;
         }
 
-        // Selección secreta del impostor
-        const idxImpostor = Math.floor(Math.random() * participantes.length);
-        nombreImpostor = participantes[idxImpostor];
+        reorganizarUnaPorcionPorJugador();
 
-        participantes.forEach(nom => {
-            jugadoresData[nom].vidas = 3;
-            jugadoresData[nom].eliminado = false;
-            jugadoresData[nom].esImpostor = (nom === nombreImpostor);
-        });
+        cartuchosRestantes = 12;
+        tamborBalas = new Array(10).fill(true).concat(new Array(2).fill(false));
+        tamborBalas.sort(() => Math.random() - 0.5);
 
         const payload = {
             participantes,
             jugadoresData,
-            nombreImpostor
+            porciones,
+            anguloActual,
+            cartuchosRestantes,
+            tamborBalas
         };
 
         canal.send({ type: 'broadcast', event: 'iniciar_partida', payload });
@@ -441,403 +641,599 @@
         partidaEnCurso = true;
         participantes = data.participantes;
         jugadoresData = data.jugadoresData;
-        nombreImpostor = data.nombreImpostor;
-
-        soyImpostor = (miNombre === nombreImpostor);
+        porciones = data.porciones;
+        anguloActual = data.anguloActual;
+        cartuchosRestantes = data.cartuchosRestantes;
+        tamborBalas = data.tamborBalas;
+        afectadoConBalaImpacto = null;
+        jugadorConBalaActual = null;
 
         document.getElementById('bloqueRegistro').classList.add('d-none');
         document.getElementById('btnIniciarAdmin').disabled = true;
-
-        if (soyImpostor) {
-            document.getElementById('panelImpostor').classList.remove('d-none');
-        }
+        document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
 
         const snd = document.getElementById('sndFondo');
         if (snd) { snd.currentTime = 0; snd.play().catch(() => {}); }
 
-        renderizarTodo();
+        dibujarRuleta();
+        renderizarListaJugadores();
 
         if (esAdmin) {
-            setTimeout(turnoDelJuego, 1500);
+            setTimeout(iniciarFaseBala, 1500);
         }
     }
 
-    function turnoDelJuego() {
+    // ========================================================
+    // FASE 1: ASIGNACIÓN DE LA BALA (AGRESOR)
+    // ========================================================
+    function iniciarFaseBala() {
         if (!partidaEnCurso) return;
-        const vivos = obtenerSobrevivientes();
+        const vivos = obtenerVivos();
 
-        if (vivos.length <= 1) {
-            evaluarGanadorFinal();
+        if (vivos.length <= 1 || cartuchosRestantes <= 0) {
+            evaluarFinPartida();
             return;
         }
 
-        // CASO A: Solo quedan 2 jugadores -> Ruleta Rusa Directa (Cerebro ya no opera)
-        if (vivos.length === 2) {
-            document.getElementById('txtEstado').innerText = "💀 Duelo Final: ¡Solo quedan 2! La ruleta rusa gira directamente.";
-            canal.send({ type: 'broadcast', event: 'aviso_global', payload: { texto: "💀 Duelo Final: ¡Ruleta directa para los 2 sobrevivientes!" } });
-            setTimeout(() => ejecutarTiroRuletaDirecta(vivos), 2000);
-            return;
-        }
+        afectadoConBalaImpacto = null;
+        const agresor = vivos[Math.floor(Math.random() * vivos.length)];
+        const payload = { agresor };
 
-        // CASO B: Hay más de 2 jugadores -> Cerebro selecciona a 2 contrincantes
-        document.getElementById('txtEstado').innerText = "🧠 Cerebro está eligiendo a dos víctimas para el duelo...";
-
-        const copia = [...vivos];
-        const p1 = copia.splice(Math.floor(Math.random() * copia.length), 1)[0];
-        const p2 = copia.splice(Math.floor(Math.random() * copia.length), 1)[0];
-
-        const payloadDuelo = { p1, p2 };
-        canal.send({ type: 'broadcast', event: 'iniciar_duelo', payload: payloadDuelo });
-        recibirIniciarDuelo(payloadDuelo);
+        canal.send({ type: 'broadcast', event: 'bala_marcada', payload });
+        recibirBalaMarcada(payload);
     }
 
-    // ========================================================
-    // DUELO 2 VS 2 (ENDGAME)
-    // ========================================================
-    function recibirIniciarDuelo(data) {
-        dueloActivo = data;
-        decisionesDuelo = {};
-        miEleccionPos = null;
-        miEleccionDisp = null;
+    function recibirBalaMarcada(data) {
+        jugadorConBalaActual = data.agresor;
+        document.getElementById('txtEstado').innerText = `💣 ¡La bala cayó en la porción de ${data.agresor}! Es el Agresor.`;
+        reproducirSonido('sndClick');
 
-        document.getElementById('txtEstado').innerText = `⚔️ Duelo elegido por Cerebro: ${data.p1} VS ${data.p2}`;
+        dibujarRuleta();
+        renderizarListaJugadores();
 
-        // Si este cliente es participante del duelo, despliega el modal
-        if (miNombre === data.p1 || miNombre === data.p2) {
-            const rival = (miNombre === data.p1) ? data.p2 : data.p1;
-            document.getElementById('lblDueloRival').innerText = rival;
-            document.getElementById('dueloEsperando').classList.add('d-none');
-
-            // Resetear botones
-            ['btnPos1', 'btnPos2', 'btnDisp1', 'btnDisp2'].forEach(id => {
-                const b = document.getElementById(id);
-                b.disabled = false;
-                b.classList.remove('btn-info', 'btn-danger');
-                if (id.startsWith('btnPos')) b.classList.add('btn-outline-info');
-                else b.classList.add('btn-outline-danger');
-            });
-
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDuelo'));
-            modal.show();
-
-            // Temporizador de 10s para decidir
-            iniciarTimerDuelo(10);
-        }
-    }
-
-    function elegirPosicion(num) {
-        miEleccionPos = num;
-        document.getElementById('btnPos1').className = num === 1 ? 'btn btn-info px-4 fw-bold' : 'btn btn-outline-info px-4 fw-bold';
-        document.getElementById('btnPos2').className = num === 2 ? 'btn btn-info px-4 fw-bold' : 'btn btn-outline-info px-4 fw-bold';
-        verificarEnvioDecisionDuelo();
-    }
-
-    function elegirDisparo(num) {
-        miEleccionDisp = num;
-        document.getElementById('btnDisp1').className = num === 1 ? 'btn btn-danger px-4 fw-bold' : 'btn btn-outline-danger px-4 fw-bold';
-        document.getElementById('btnDisp2').className = num === 2 ? 'btn btn-danger px-4 fw-bold' : 'btn btn-outline-danger px-4 fw-bold';
-        verificarEnvioDecisionDuelo();
-    }
-
-    function verificarEnvioDecisionDuelo() {
-        if (miEleccionPos !== null && miEleccionDisp !== null) {
-            document.getElementById('dueloEsperando').classList.remove('d-none');
-            document.getElementById('btnPos1').disabled = true;
-            document.getElementById('btnPos2').disabled = true;
-            document.getElementById('btnDisp1').disabled = true;
-            document.getElementById('btnDisp2').disabled = true;
-
-            const decision = { jugador: miNombre, pos: miEleccionPos, disp: miEleccionDisp };
-            canal.send({ type: 'broadcast', event: 'decision_duelo', payload: decision });
-            recibirDecisionDuelo(decision);
-        }
-    }
-
-    function recibirDecisionDuelo(data) {
-        decisionesDuelo[data.jugador] = { pos: data.pos, disp: data.disp };
-
-        if (esAdmin && dueloActivo) {
-            // Si ambos jugadores enviaron su jugada
-            if (decisionesDuelo[dueloActivo.p1] && decisionesDuelo[dueloActivo.p2]) {
-                setTimeout(resolverDuelo, 1000);
+        setTimeout(() => {
+            if (esAdmin && data.agresor === "Cerebro") {
+                const rivales = obtenerVivos().filter(nom => nom !== "Cerebro");
+                const defensorElegido = rivales[Math.floor(Math.random() * rivales.length)];
+                enviarPropuestaReto("Cerebro", defensorElegido);
+                return;
             }
+
+            if (miNombre === data.agresor) {
+                const cont = document.getElementById('contenedorBotonesRivales');
+                cont.innerHTML = "";
+                const rivales = obtenerVivos().filter(nom => nom !== miNombre);
+
+                rivales.forEach(riv => {
+                    const b = document.createElement('button');
+                    b.className = "btn btn-outline-danger fw-bold";
+                    b.innerText = `🛡️ Retar a ${riv} (Defensor)`;
+                    b.onclick = () => {
+                        bootstrap.Modal.getInstance(document.getElementById('modalElegirRival')).hide();
+                        enviarPropuestaReto(miNombre, riv);
+                    };
+                    cont.appendChild(b);
+                });
+
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalElegirRival')).show();
+            }
+        }, 3500);
+    }
+
+    function enviarPropuestaReto(agresor, defensor) {
+        const payload = { agresor, defensor };
+        canal.send({ type: 'broadcast', event: 'propuesta_reto', payload });
+        recibirPropuestaReto(payload);
+    }
+
+    function optarPorNoRetar() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalElegirRival'));
+        if (modal) modal.hide();
+
+        const payload = { jugador: miNombre };
+        canal.send({ type: 'broadcast', event: 'no_retar', payload });
+        recibirNoRetar(payload);
+    }
+
+    function recibirNoRetar(p) {
+        asegurarTotalPorciones(p.jugador, 2);
+        const msg = `🏳️ ${p.jugador} optó por NO retar a nadie. Su nombre pasó a tener 2 porciones en la ruleta.`;
+        
+        dibujarRuleta();
+        renderizarListaJugadores();
+        document.getElementById('txtEstado').innerText = msg;
+
+        // El Administrador ejecuta autoritativamente el giro
+        if (esAdmin) {
+            sincronizarTodo(msg);
+            setTimeout(iniciarGiroRuleta, 2500);
         }
     }
 
-    function iniciarTimerDuelo(segundos) {
+    // ========================================================
+    // FASE 2: RESPUESTA DEL DEFENSOR
+    // ========================================================
+    function recibirPropuestaReto(data) {
+        dueloInfo = data;
+        document.getElementById('txtEstado').innerText = `⚔️ Agresor: ${data.agresor} desafió a Defensor: ${data.defensor}. Esperando respuesta...`;
+
+        if (esAdmin && data.defensor === "Cerebro") {
+            setTimeout(() => responderReto(true), 1200);
+            return;
+        }
+
+        if (miNombre === data.defensor) {
+            document.getElementById('lblAgresorNombre').innerText = data.agresor;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalResponderReto')).show();
+        }
+    }
+
+    function responderReto(acepto) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalResponderReto'));
+        if (modal) modal.hide();
+
+        if (acepto) {
+            const payload = { agresor: dueloInfo.agresor, defensor: dueloInfo.defensor };
+            canal.send({ type: 'broadcast', event: 'iniciar_arena', payload });
+            recibirIniciarArena(payload);
+        } else {
+            // Se emite por broadcast para que todos sincronicen y el Admin reanude
+            const payloadRechazo = { defensor: dueloInfo.defensor };
+            canal.send({ type: 'broadcast', event: 'rechazo_reto', payload: payloadRechazo });
+            recibirRechazoReto(payloadRechazo);
+        }
+    }
+
+    function recibirRechazoReto(p) {
+        asegurarTotalPorciones(p.defensor, 2);
+        const msg = `🏃 ${p.defensor} (Defensor) rechazó el duelo. Pasó a tener 2 porciones en la ruleta.`;
+        
+        dibujarRuleta();
+        renderizarListaJugadores();
+        document.getElementById('txtEstado').innerText = msg;
+
+        // El Administrador dispara autoritativamente el giro para reanudar el juego
+        if (esAdmin) {
+            sincronizarTodo(msg);
+            setTimeout(iniciarGiroRuleta, 2500);
+        }
+    }
+
+    // ========================================================
+    // FASE 3: ARENA TÁCTICA (CLIC DIRECTO EN LAS CELDAS)
+    // ========================================================
+    function recibirIniciarArena(data) {
+        dueloInfo = data;
+        eleccionesDuelo = {};
+        miEleccionDuelo = { pos: null, disp: null };
+        dueloBloqueado = false;
+
+        document.getElementById('lblAgresorTitulo').innerText = data.agresor;
+        document.getElementById('lblDefensorTitulo').innerText = data.defensor;
+        document.getElementById('headerNombreAgresor').innerText = `${data.agresor} (Agresor)`;
+        document.getElementById('headerNombreDefensor').innerText = `${data.defensor} (Defensor)`;
+
+        document.getElementById('cuadroResultadoDuelo').classList.add('d-none');
+        document.getElementById('badgeTimerDuelo').innerText = "5s";
+        document.getElementById('lblEstadoEleccionPersonal').innerText = "";
+
+        ['celda_col1_1', 'celda_col1_2', 'celda_col2_1', 'celda_col2_2'].forEach(id => {
+            const el = document.getElementById(id);
+            el.className = 'celda-arena-fila';
+            el.querySelector('.fila-contenido').innerHTML = '';
+        });
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDueloTactico')).show();
+
+        if (esAdmin && (data.agresor === "Cerebro" || data.defensor === "Cerebro")) {
+            setTimeout(() => {
+                const jugada = {
+                    jugador: "Cerebro",
+                    pos: Math.random() < 0.5 ? 1 : 2,
+                    disp: Math.random() < 0.5 ? 1 : 2
+                };
+                canal.send({ type: 'broadcast', event: 'jugada_arena', payload: jugada });
+                recibirJugadaArena(jugada);
+            }, 1000);
+        }
+
+        iniciarTimerArena(5);
+    }
+
+    function pulsarCeldaArena(columna, fila) {
+        if (dueloBloqueado) return;
+        const soyAgresor = (miNombre === dueloInfo.agresor);
+        const soyDefensor = (miNombre === dueloInfo.defensor);
+
+        if (!soyAgresor && !soyDefensor) return;
+
+        const miColumnaPropia = soyAgresor ? 1 : 2;
+        const colRival = soyAgresor ? 2 : 1;
+
+        if (columna === miColumnaPropia) {
+            miEleccionDuelo.pos = fila;
+            document.getElementById(`celda_col${columna}_1`).classList.remove('celda-cobertura-propia');
+            document.getElementById(`celda_col${columna}_2`).classList.remove('celda-cobertura-propia');
+            document.getElementById(`celda_col${columna}_${fila}`).classList.add('celda-cobertura-propia');
+        } else if (columna === colRival) {
+            miEleccionDuelo.disp = fila;
+            document.getElementById(`celda_col${columna}_1`).classList.remove('celda-disparo-objetivo');
+            document.getElementById(`celda_col${columna}_2`).classList.remove('celda-disparo-objetivo');
+            document.getElementById(`celda_col${columna}_${fila}`).classList.add('celda-disparo-objetivo');
+        }
+
+        const estadoLbl = document.getElementById('lblEstadoEleccionPersonal');
+        estadoLbl.innerText = `🛡️ Tu cobertura: Fila ${miEleccionDuelo.pos || '?'} | 🔫 Tu disparo: Fila ${miEleccionDuelo.disp || '?'}`;
+
+        if (miEleccionDuelo.pos !== null && miEleccionDuelo.disp !== null) {
+            const payload = { jugador: miNombre, pos: miEleccionDuelo.pos, disp: miEleccionDuelo.disp };
+            canal.send({ type: 'broadcast', event: 'jugada_arena', payload });
+            recibirJugadaArena(payload);
+        }
+    }
+
+    function recibirJugadaArena(data) {
+        eleccionesDuelo[data.jugador] = { pos: data.pos, disp: data.disp };
+    }
+
+    function iniciarTimerArena(segundos) {
         let t = segundos;
-        const lbl = document.getElementById('timerDuelo');
-        lbl.innerText = `${t}s`;
+        const badge = document.getElementById('badgeTimerDuelo');
+        badge.innerText = `${t}s`;
+
         const interval = setInterval(() => {
             t--;
-            lbl.innerText = `${t}s`;
-            if (t <= 0 || (miEleccionPos !== null && miEleccionDisp !== null)) {
+            badge.innerText = `${t}s`;
+            if (t <= 0) {
                 clearInterval(interval);
-                // Si no eligió a tiempo, auto-asigna
-                if (miEleccionPos === null) elegirPosicion(Math.random() < 0.5 ? 1 : 2);
-                if (miEleccionDisp === null) elegirDisparo(Math.random() < 0.5 ? 1 : 2);
+                badge.innerText = "0s";
+                dueloBloqueado = true;
+
+                const soyParticipante = (miNombre === dueloInfo.agresor || miNombre === dueloInfo.defensor);
+                if (soyParticipante && (miEleccionDuelo.pos === null || miEleccionDuelo.disp === null)) {
+                    if (miEleccionDuelo.pos === null) miEleccionDuelo.pos = Math.random() < 0.5 ? 1 : 2;
+                    if (miEleccionDuelo.disp === null) miEleccionDuelo.disp = Math.random() < 0.5 ? 1 : 2;
+                    const payload = { jugador: miNombre, pos: miEleccionDuelo.pos, disp: miEleccionDuelo.disp };
+                    canal.send({ type: 'broadcast', event: 'jugada_arena', payload });
+                    recibirJugadaArena(payload);
+                }
+
+                if (esAdmin) {
+                    setTimeout(resolverArenaTactico, 500);
+                }
             }
         }, 1000);
     }
 
-    function resolverDuelo() {
-        const p1 = dueloActivo.p1;
-        const p2 = dueloActivo.p2;
-        const d1 = decisionesDuelo[p1];
-        const d2 = decisionesDuelo[p2];
+    function resolverArenaTactico() {
+        const { agresor, defensor } = dueloInfo;
+        const j1 = eleccionesDuelo[agresor] || { pos: 1, disp: 1 };
+        const j2 = eleccionesDuelo[defensor] || { pos: 1, disp: 1 };
 
-        // p1 dispara a d1.disp; impacta si d2.pos === d1.disp
-        const p2RecibeImpacto = (d2.pos === d1.disp);
-        // p2 dispara a d2.disp; impacta si d1.pos === d2.disp
-        const p1RecibeImpacto = (d1.pos === d2.disp);
+        const j1Acierta = (j1.disp === j2.pos);
+        const j2Acierta = (j2.disp === j1.pos);
 
-        let textoResultado = "";
+        let perdedorUnico = null;
+        let tituloHtml = "";
+        let resumenTexto = "";
 
-        if (p1RecibeImpacto && p2RecibeImpacto) {
-            jugadoresData[p1].vidas--;
-            jugadoresData[p2].vidas--;
-            textoResultado = `💥 ¡Fuego cruzado! Ambos acertaron: ${p1} (-1❤️) y ${p2} (-1❤️).`;
-        } else if (p1RecibeImpacto) {
-            jugadoresData[p1].vidas--;
-            textoResultado = `🎯 ¡${p2} acertó el búnker de ${p1}! ${p1} pierde 1❤️.`;
-        } else if (p2RecibeImpacto) {
-            jugadoresData[p2].vidas--;
-            textoResultado = `🎯 ¡${p1} acertó el búnker de ${p2}! ${p2} pierde 1❤️.`;
+        if (j1Acierta && j2Acierta) {
+            tituloHtml = `💥 ¡FUEGO CRUZADO! Ambos acertaron con sus pistolas 🔫.`;
+            resumenTexto = `
+                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (ACERTÓ 🎯)</div>
+                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (ACERTÓ 🎯)</div>
+                <div class="text-warning mt-1 fw-bold">Ambos jugadores tendrán un total de 2 porciones en la ruleta.</div>
+            `;
+            asegurarTotalPorciones(agresor, 2);
+            asegurarTotalPorciones(defensor, 2);
+        } else if (j1Acierta) {
+            perdedorUnico = defensor;
+            tituloHtml = `🎯 ¡IMPACTO CERTERO! El Agresor ${agresor} acertó su disparo 🔫.`;
+            resumenTexto = `
+                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (ACERTÓ 🎯)</div>
+                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (FALLÓ 💨)</div>
+                <div class="text-danger mt-1 fw-bold">${defensor} tendrá 3 porciones en la ruleta.</div>
+            `;
+            asegurarTotalPorciones(perdedorUnico, 3);
+        } else if (j2Acierta) {
+            perdedorUnico = agresor;
+            tituloHtml = `🎯 ¡IMPACTO CERTERO! El Defensor ${defensor} repelió y acertó 🔫.`;
+            resumenTexto = `
+                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (FALLÓ 💨)</div>
+                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (ACERTÓ 🎯)</div>
+                <div class="text-danger mt-1 fw-bold">${agresor} tendrá 3 porciones en la ruleta.</div>
+            `;
+            asegurarTotalPorciones(perdedorUnico, 3);
         } else {
-            textoResultado = `💨 ¡Ambos dispararon a búnkers vacíos! Nadie recibe daño.`;
+            tituloHtml = `💨 ¡AMBOS FALLARON! Disparos a trincheras vacías 🔫.`;
+            resumenTexto = `
+                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (FALLÓ 💨)</div>
+                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (FALLÓ 💨)</div>
+            `;
         }
 
-        reproducirSonido('sndDisparo');
-
-        // Chequeo de bajas
-        [p1, p2].forEach(p => {
-            if (jugadoresData[p].vidas <= 0) {
-                jugadoresData[p].eliminado = true;
-                textoResultado += ` ⚰️ ${p} ha sido eliminado.`;
-            }
-        });
-
-        // Sincronizar y cerrar modales
-        sincronizarEstado(textoResultado);
-
-        setTimeout(() => {
-            if (verificarFinPorImpostor()) return;
-            turnoDelJuego();
-        }, 3000);
-    }
-
-    // ========================================================
-    // EVASIÓN DEL IMPOSTOR Y GIRO DE RULETA
-    // ========================================================
-    function evadirComoImpostor() {
-        if (!partidaEnCurso || girando) return;
-
-        const vivos = obtenerSobrevivientes();
-        const n = vivos.length;
-        if (n <= 1) return;
-
-        document.getElementById('panelImpostor').classList.add('d-none');
-
-        // La ruleta gira un múltiplo aleatorio de 360/n
-        const anguloSector = 360 / n;
-        // 50% de probabilidad de caer en sector y 50% en raya divisoria
-        const caerEnRaya = Math.random() < 0.5;
-
-        // k vueltas completas (múltiplo de n) + desplazamiento
-        const vueltasCompletas = (Math.floor(Math.random() * 3) + 3) * 360;
-        const indiceAleatorio = Math.floor(Math.random() * n);
-
-        let gradosFinales = vueltasCompletas + (indiceAleatorio * anguloSector);
-        if (!caerEnRaya) {
-            gradosFinales += (anguloSector / 2); // Cae en el centro del sector
-        }
-
-        const payloadGiro = {
-            gradosGiro: gradosFinales,
-            resultado: {
-                caerEnRaya: caerEnRaya,
-                jugadorApuntado: vivos[indiceAleatorio],
-                jugadoresRaya: [vivos[indiceAleatorio], vivos[(indiceAleatorio + 1) % n]]
-            }
+        const payloadResultado = {
+            agresor,
+            defensor,
+            j1,
+            j2,
+            j1Acierta,
+            j2Acierta,
+            tituloHtml,
+            resumenTexto
         };
 
-        canal.send({ type: 'broadcast', event: 'girar_ruleta_impostor', payload: payloadGiro });
-        animarGiroRuleta(payloadGiro.gradosGiro, payloadGiro.resultado);
+        canal.send({ type: 'broadcast', event: 'resultado_arena', payload: payloadResultado });
+        recibirResultadoArena(payloadResultado);
+
+        setTimeout(() => {
+            forzarCierreModalDuelo();
+            sincronizarTodo(`Duelo finalizado entre ${agresor} y ${defensor}.`);
+
+            if (esAdmin) {
+                setTimeout(iniciarGiroRuleta, 2000);
+            }
+        }, 4000);
     }
 
-    function animarGiroRuleta(gradosTotal, resultado) {
+    function recibirResultadoArena(p) {
+        ['celda_col1_1', 'celda_col1_2', 'celda_col2_1', 'celda_col2_2'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.querySelector('.fila-contenido').innerHTML = '';
+        });
+
+        const celdaCobAgresor = document.getElementById(`celda_col1_${p.j1.pos}`);
+        const celdaCobDefensor = document.getElementById(`celda_col2_${p.j2.pos}`);
+
+        if (celdaCobAgresor) {
+            celdaCobAgresor.querySelector('.fila-contenido').innerHTML = `
+                <span class="badge bg-danger badge-combatiente-arena">${p.agresor}</span>
+            `;
+        }
+
+        if (celdaCobDefensor) {
+            celdaCobDefensor.querySelector('.fila-contenido').innerHTML = `
+                <span class="badge bg-primary badge-combatiente-arena">${p.defensor}</span>
+            `;
+        }
+
+        const celdaDispAgresor = document.getElementById(`celda_col2_${p.j1.disp}`);
+        if (celdaDispAgresor) {
+            const cont = celdaDispAgresor.querySelector('.fila-contenido');
+            cont.innerHTML += `<span class="fs-6" title="Disparo de ${p.agresor}">🔫</span>`;
+            if (p.j1Acierta) {
+                cont.innerHTML += `<span class="fs-5">💥</span>`;
+            }
+        }
+
+        const celdaDispDefensor = document.getElementById(`celda_col1_${p.j2.disp}`);
+        if (celdaDispDefensor) {
+            const cont = celdaDispDefensor.querySelector('.fila-contenido');
+            cont.innerHTML += `<span class="fs-6" title="Disparo de ${p.defensor}">🔫</span>`;
+            if (p.j2Acierta) {
+                cont.innerHTML += `<span class="fs-5">💥</span>`;
+            }
+        }
+
+        const cuadroRes = document.getElementById('cuadroResultadoDuelo');
+        const tituloRes = document.getElementById('resumenDueloTitulo');
+        const detalleRes = document.getElementById('resumenDueloDetalle');
+
+        tituloRes.innerHTML = p.tituloHtml;
+        detalleRes.innerHTML = p.resumenTexto;
+        cuadroRes.classList.remove('d-none');
+        reproducirSonido('sndDisparo');
+    }
+
+    function asegurarTotalPorciones(nombre, totalDeseado) {
+        let actuales = porciones.filter(p => p === nombre).length;
+        for (let i = 0; i < porciones.length && actuales < totalDeseado; i++) {
+            if (porciones[i] === null) {
+                porciones[i] = nombre;
+                actuales++;
+            }
+        }
+    }
+
+    // ========================================================
+    // FASE 4: GIRO DE LA RULETA & DESCUENTO EXACTO DE CARTUCHOS
+    // ========================================================
+    function iniciarGiroRuleta() {
+        if (!partidaEnCurso || girando) return;
+
+        const totalPorciones = porciones.length;
+        const sectorRad = (Math.PI * 2) / totalPorciones;
+        const indiceDestino = Math.floor(Math.random() * totalPorciones);
+
+        const vueltas = (Math.floor(Math.random() * 4) + 4) * (Math.PI * 2);
+        const anguloObjetivo = vueltas - (indiceDestino * sectorRad) - (sectorRad / 2);
+
+        // Descuento único y autoritativo del Admin
+        cartuchosRestantes--;
+        const tieneBala = tamborBalas.pop() || false;
+
+        const payload = {
+            anguloFinalRadianes: anguloObjetivo,
+            indiceDestino: indiceDestino,
+            tieneBala: tieneBala,
+            cartuchosRestantes: cartuchosRestantes
+        };
+
+        canal.send({ type: 'broadcast', event: 'girar_disparo', payload });
+        animarGiroDisparo(payload);
+    }
+
+    function animarGiroDisparo(data) {
         girando = true;
-        document.getElementById('txtEstado').innerText = "⚠️ ¡Un IMPOSTOR ha evadido la contienda! La pistola gira en la Ruleta...";
+        jugadorConBalaActual = null;
+        afectadoConBalaImpacto = null;
+        document.getElementById('txtEstado').innerText = "🎡 La ruleta está girando...";
 
-        // Cierra modales abiertos si los hubiera
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
-        if (modal) modal.hide();
+        // Se sincroniza el cartucho exacto que emitió el host para todas las pantallas
+        cartuchosRestantes = data.cartuchosRestantes;
+        document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
 
-        const duracion = 4000;
-        const inicioTiempo = performance.now();
+        forzarCierreModalDuelo();
+
+        const duracion = 4200;
+        const inicio = performance.now();
         const anguloInicial = anguloActual;
-        const radianesGiro = (gradosTotal * Math.PI) / 180;
+        const deltaAngulo = data.anguloFinalRadianes - (anguloInicial % (Math.PI * 2));
 
         function step(now) {
-            const elapsed = now - inicioTiempo;
+            const elapsed = now - inicio;
             const progress = Math.min(elapsed / duracion, 1);
-            // Curva de frenado suave easeOutCubic
             const easeOut = 1 - Math.pow(1 - progress, 3);
 
-            anguloActual = anguloInicial + (radianesGiro * easeOut);
+            anguloActual = anguloInicial + (deltaAngulo * easeOut);
             dibujarRuleta();
 
             if (progress < 1) {
                 requestAnimationFrame(step);
             } else {
                 girando = false;
-                procesarResultadoRuleta(resultado);
+                const sectorRad = (Math.PI * 2) / porciones.length;
+                anguloActual = -(data.indiceDestino * sectorRad) - (sectorRad / 2);
+                dibujarRuleta();
+
+                document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
+                procesarDisparoRuleta(data);
             }
         }
 
         requestAnimationFrame(step);
     }
 
-    function procesarResultadoRuleta(res) {
-        if (!esAdmin) return;
+    function procesarDisparoRuleta(data) {
+        const ocupante = porciones[data.indiceDestino];
+        let mensaje = "";
 
-        // CASO 1: Cayó en Raya Divisoria -> Duelo inmediato entre los 2 colindantes
-        if (res.caerEnRaya) {
-            const [p1, p2] = res.jugadoresRaya;
-            const msg = `⚡ ¡La aguja cayó en la RAYA divisoria! Duelo forzado entre ${p1} y ${p2}.`;
-            sincronizarEstado(msg);
+        if (data.tieneBala) {
+            reproducirSonido('sndDisparo');
+            if (ocupante && jugadoresData[ocupante] && !jugadoresData[ocupante].eliminado) {
+                // SOLO EL ADMIN descuenta exactamente 1 corazón
+                if (esAdmin) {
+                    jugadoresData[ocupante].vidas = Math.max(0, jugadoresData[ocupante].vidas - 1);
+                    if (jugadoresData[ocupante].vidas <= 0) {
+                        jugadoresData[ocupante].eliminado = true;
+                    }
+                }
 
-            setTimeout(() => {
-                const payloadDuelo = { p1, p2 };
-                canal.send({ type: 'broadcast', event: 'iniciar_duelo', payload: payloadDuelo });
-                recibirIniciarDuelo(payloadDuelo);
-            }, 2500);
-        }
-        // CASO 2: Cayó en un Jugador -> Disparo de la pistola (10 de 12 probabilidad de bala)
-        else {
-            const victima = res.jugadorApuntado;
-            // 10 balas en 12 recámaras
-            const hayBala = Math.random() < (10 / 12);
+                afectadoConBalaImpacto = ocupante;
+                mensaje = `💥 ¡BANG! Había bala en el cartucho. Impactó a ${ocupante} • (-1 ❤️).`;
 
-            let msg = `🎯 La pistola apunta a ${victima}... *¡CLICK!* `;
-            if (hayBala) {
-                reproducirSonido('sndDisparo');
-                jugadoresData[victima].vidas--;
-                msg += `💥 ¡BANG! Había bala en el cartucho. ${victima} pierde 1❤️.`;
-                if (jugadoresData[victima].vidas <= 0) {
-                    jugadoresData[victima].eliminado = true;
-                    msg += ` ⚰️ ${victima} ha muerto.`;
+                if (jugadoresData[ocupante].vidas <= 0) {
+                    mensaje += ` ⚰️ ${ocupante} ha sido eliminado.`;
                 }
             } else {
-                reproducirSonido('sndClick');
-                msg += `💨 ¡Recámara vacía! ${victima} se ha salvado milagrosamente.`;
+                mensaje = `💥 ¡BANG! La bala impactó en una porción vacía [${data.indiceDestino + 1}].`;
             }
+        } else {
+            reproducirSonido('sndClick');
+            mensaje = `💨 *¡CLICK!* Cartucho vacío. ${ocupante ? ocupante : 'La ruleta'} se salva milagrosamente.`;
+        }
 
-            sincronizarEstado(msg);
+        dibujarRuleta();
+        renderizarListaJugadores();
+
+        // El Admin sincroniza el estado oficial con 1 sola vida descontada
+        if (esAdmin) {
+            sincronizarTodo(mensaje);
 
             setTimeout(() => {
-                if (verificarFinPorImpostor()) return;
-                turnoDelJuego();
-            }, 3000);
+                if (evaluarFinPartida()) return;
+
+                document.getElementById('txtEstado').innerText = "⚠️ Reorganizando posiciones de manera aleatoria en la ruleta...";
+                canal.send({ type: 'broadcast', event: 'sincronizar_todo', payload: { textoAviso: "⚠️ Reorganizando posiciones en la ruleta..." } });
+
+                setTimeout(() => {
+                    reorganizarUnaPorcionPorJugador();
+                    afectadoConBalaImpacto = null;
+                    sincronizarTodo("✅ Posiciones reasignadas. Preparando siguiente ronda...");
+
+                    setTimeout(iniciarFaseBala, 2500);
+                }, 2500);
+            }, 3500);
+        } else {
+            document.getElementById('txtEstado').innerText = mensaje;
         }
-    }
-
-    // ========================================================
-    // RULETA DIRECTA FINAL (CUANDO QUEDAN 2 JUGADORES)
-    // ========================================================
-    function ejecutarTiroRuletaDirecta(vivos) {
-        if (!esAdmin) return;
-
-        // En ruleta directa, gira hacia uno de los 2
-        const elegido = vivos[Math.floor(Math.random() * vivos.length)];
-        const anguloGiro = (Math.floor(Math.random() * 4) + 4) * 360 + (vivos.indexOf(elegido) * 180) + 90;
-
-        const payloadGiro = {
-            gradosGiro: anguloGiro,
-            resultado: {
-                caerEnRaya: false,
-                jugadorApuntado: elegido
-            }
-        };
-
-        canal.send({ type: 'broadcast', event: 'girar_ruleta_impostor', payload: payloadGiro });
-        animarGiroRuleta(payloadGiro.gradosGiro, payloadGiro.resultado);
     }
 
     // ========================================================
     // SINCRONIZACIÓN Y FIN DE PARTIDA
     // ========================================================
-    function sincronizarEstado(textoAviso) {
-        renderizarTodo();
+    function sincronizarTodo(textoAviso) {
+        renderizarListaJugadores();
+        dibujarRuleta();
+
         if (textoAviso) {
             document.getElementById('txtEstado').innerText = textoAviso;
-            canal.send({ type: 'broadcast', event: 'aviso_global', payload: { texto: textoAviso } });
         }
 
         canal.send({
             type: 'broadcast',
-            event: 'sincronizar_estado',
+            event: 'sincronizar_todo',
             payload: {
                 jugadoresData,
-                anguloActual
+                porciones,
+                cartuchosRestantes,
+                anguloActual,
+                jugadorConBalaActual,
+                afectadoConBalaImpacto,
+                textoAviso
             }
         });
     }
 
     function recibirSincronizacion(p) {
         jugadoresData = p.jugadoresData || jugadoresData;
-        anguloActual = p.anguloActual || anguloActual;
+        porciones = p.porciones || porciones;
+        cartuchosRestantes = (p.cartuchosRestantes !== undefined) ? p.cartuchosRestantes : cartuchosRestantes;
+        anguloActual = (p.anguloActual !== undefined) ? p.anguloActual : anguloActual;
+        jugadorConBalaActual = p.jugadorConBalaActual;
+        afectadoConBalaImpacto = p.afectadoConBalaImpacto;
 
-        // Cerrar modal de duelo si ya se resolvió
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
-        if (modal) modal.hide();
+        forzarCierreModalDuelo();
 
-        renderizarTodo();
-    }
-
-    function verificarFinPorImpostor() {
-        if (nombreImpostor && jugadoresData[nombreImpostor]?.vidas <= 0) {
-            const payloadFin = {
-                titulo: "💀 EL IMPOSTOR HA CAÍDO",
-                subtitulo: `El impostor (${nombreImpostor}) ha perdido sus 3 corazones. El juego de Cerebro ha terminado.`,
-                jugadoresDataFinal: JSON.parse(JSON.stringify(jugadoresData))
-            };
-            canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
-            recibirFinPartida(payloadFin);
-            return true;
+        document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
+        if (p.textoAviso) {
+            document.getElementById('txtEstado').innerText = p.textoAviso;
         }
-        return false;
+
+        renderizarListaJugadores();
+        dibujarRuleta();
     }
 
-    function evaluarGanadorFinal() {
-        const vivos = obtenerSobrevivientes();
-        let tit = "FIN DEL JUEGO";
+    function evaluarFinPartida() {
+        const vivos = obtenerVivos();
+        let tit = "";
         let sub = "";
 
         if (vivos.length === 1) {
-            tit = `👑 ¡${vivos[0]} ES EL ÚLTIMO SOBREVIVIENTE!`;
-            sub = `Ha sobrevivido a la ruleta y al juicio de Cerebro.`;
+            tit = `👑 ¡VICTORIA DE ${vivos[0].toUpperCase()}!`;
+            sub = `Es el único sobreviviente tras superar los duelos tácticos y la ruleta.`;
+        } else if (vivos.length === 0) {
+            tit = "💀 EMPATE TOTAL";
+            sub = "Todos los combatientes han caído.";
+        } else if (cartuchosRestantes <= 0) {
+            tit = "🏁 FIN DE LOS 12 CARTUCHOS";
+            sub = `Se agotaron los 12 cartuchos. Sobrevivientes: ${vivos.join(', ')}.`;
         } else {
-            tit = "EMPATE TOTAL";
-            sub = "Todos los combatientes perecieron ante la ruleta.";
+            return false;
         }
 
-        const payloadFin = { titulo: tit, subtitulo: sub, jugadoresDataFinal: JSON.parse(JSON.stringify(jugadoresData)) };
+        const payloadFin = { titulo: tit, subtitulo: sub };
         canal.send({ type: 'broadcast', event: 'fin_partida', payload: payloadFin });
         recibirFinPartida(payloadFin);
+        return true;
     }
 
     function recibirFinPartida(payload) {
         partidaEnCurso = false;
-        jugadoresData = payload.jugadoresDataFinal || jugadoresData;
-
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalDuelo'));
-        if (modal) modal.hide();
-
+        forzarCierreModalDuelo();
         document.getElementById('vicTitulo').innerText = payload.titulo;
         document.getElementById('vicSubtitulo').innerText = payload.subtitulo;
         document.getElementById('pantallaVictoria').classList.remove('d-none');
-        renderizarTodo();
     }
 
     function cerrarVictoria() {
@@ -854,29 +1250,34 @@
     function resetearEstadoLocal() {
         partidaEnCurso = false;
         estoyEliminado = false;
-        soyImpostor = false;
         miNombre = "";
-        nombreImpostor = "";
         participantes = [];
         jugadoresData = {};
+        porciones = [];
         anguloActual = 0;
         girando = false;
-        dueloActivo = null;
+        cartuchosRestantes = 12;
+        tamborBalas = [];
+        jugadorConBalaActual = null;
+        afectadoConBalaImpacto = null;
+
+        forzarCierreModalDuelo();
 
         const snd = document.getElementById('sndFondo');
         if (snd) { snd.pause(); snd.currentTime = 0; }
 
         document.getElementById('bloqueRegistro').classList.remove('d-none');
-        document.getElementById('panelImpostor').classList.add('d-none');
         document.getElementById('pantallaVictoria').classList.add('d-none');
         document.getElementById('btnListo').disabled = false;
         document.getElementById('inputNombre').disabled = false;
         document.getElementById('inputNombre').value = "";
         document.getElementById('msgConfirmacion').classList.add('d-none');
         document.getElementById('btnIniciarAdmin').disabled = false;
-        document.getElementById('txtEstado').innerText = "Esperando participantes para la Ruleta...";
+        document.getElementById('txtEstado').innerText = "Esperando participantes...";
+        document.getElementById('lblCartuchos').innerText = "12";
 
-        renderizarTodo();
+        renderizarListaJugadores();
+        dibujarRuleta();
     }
 
     cargarParticipantes();
