@@ -11,12 +11,8 @@
 
     <!-- BLOQUE CABECERA Y REGISTRO -->
     <div id="bloqueCabeceraRegistro">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div style="width: 38px;"></div>
+        <div class="mb-2">
             <h2 class="fw-bold text-light m-0 fs-4">💣 Guerra Táctica en Tiempo Real</h2>
-            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
-                🔊
-            </button>
         </div>
 
         <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
@@ -71,12 +67,15 @@
         </div>
     </div>
 
-    <!-- LISTA DE PARTICIPANTES -->
+    <!-- LISTA DE PARTICIPANTES CON BOTÓN DE AUDIO A LA DERECHA -->
     <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
             <span class="fw-bold small text-white text-uppercase" style="font-size: 0.8rem;">
                 Combatientes Confirmados
             </span>
+            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-0" style="width: 30px; height: 30px; font-size: 0.85rem;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
+                🔊
+            </button>
         </div>
         <div class="row g-2">
             <div class="col-6">
@@ -555,7 +554,6 @@
                 if (item === 'bomba') dMio.bombas++;
                 else if (item === 'hielo') dMio.hielos++;
 
-                // Solo suena click.mp3 aquí en su propio dispositivo
                 reproducirSonido('sndClick');
                 notificarAviso(`🎁 ${miNombre} recogió 1 ${item}.`);
                 sincronizarEstado();
@@ -622,7 +620,6 @@
             if (dMio.hielos <= 0) return;
             dMio.hielos--;
             celdasCongeladas[celdaKey] = { segRestantes: 7 };
-            // Sin sonido freezer.mp3 aquí
             notificarAviso(`🧊 ¡${miNombre} congeló la celda [${celda}] del rival por 7s!`);
         }
 
@@ -635,7 +632,6 @@
     function iniciarCiclosGlobales() {
         if (!esAdmin) return;
 
-        // 1. Caída de suministros cada 5 segundos
         clearInterval(loopGeneradorItems);
         loopGeneradorItems = setInterval(() => {
             if (!partidaEnCurso) return;
@@ -660,13 +656,11 @@
             sincronizarEstado();
         }, 5000);
 
-        // 2. Cronómetros: Bombas (3s), Hielo (7s), Bloqueos (7s) y Desvanecimiento de ítems (5s)
         clearInterval(loopCronometroCeldas);
         loopCronometroCeldas = setInterval(() => {
             if (!partidaEnCurso) return;
             let huboCambios = false;
 
-            // Desvanecer artículos del suelo a los 5s
             Object.keys(itemsSuelo).forEach(k => {
                 if (itemsSuelo[k]) {
                     itemsSuelo[k].expiraEn--;
@@ -677,7 +671,6 @@
                 }
             });
 
-            // Conteo de bombas activas
             Object.keys(bombasArmadas).forEach(k => {
                 bombasArmadas[k].seg--;
                 huboCambios = true;
@@ -688,7 +681,6 @@
                 }
             });
 
-            // Conteo de congelación (7s)
             Object.keys(celdasCongeladas).forEach(k => {
                 celdasCongeladas[k].segRestantes--;
                 huboCambios = true;
@@ -698,7 +690,6 @@
                 }
             });
 
-            // Conteo de celdas bloqueadas (7s)
             Object.keys(celdasBloqueadas).forEach(k => {
                 celdasBloqueadas[k].segRestantes--;
                 huboCambios = true;
@@ -711,7 +702,6 @@
             if (huboCambios) sincronizarEstado();
         }, 1000);
 
-        // 3. IA Dinámica de Cerebro
         clearInterval(loopIaCerebro);
         loopIaCerebro = setInterval(() => {
             if (!partidaEnCurso) return;
@@ -721,12 +711,10 @@
             const maxC = obtenerTotalCeldas();
             const miKey = `azul_${c.celda}`;
 
-            // Si su celda está congelada, NO puede moverse
             if (celdasCongeladas[miKey]) {
                 return;
             }
 
-            // A) SALVAGUARDA: Si hay bomba en su celda (y no está congelado), huye
             if (bombasArmadas[miKey]) {
                 const celdasSeguras = [];
                 for (let i = 1; i <= maxC; i++) {
@@ -740,7 +728,6 @@
                 }
             }
 
-            // B) RECOLECCIÓN EN SU CELDA
             if (itemsSuelo[miKey]) {
                 const item = itemsSuelo[miKey].tipo;
                 const puedeRecoger = (item === 'bomba' && c.bombas < TOPE_POR_ARTICULO) ||
@@ -755,7 +742,6 @@
                 }
             }
 
-            // C) BÚSQUEDA DE ÍTEMS EN OTRAS CELDAS
             for (let i = 1; i <= maxC; i++) {
                 const k = `azul_${i}`;
                 if (itemsSuelo[k] && !celdasBloqueadas[k] && !bombasArmadas[k]) {
@@ -770,7 +756,6 @@
                 }
             }
 
-            // D) ATAQUE TÁCTICO: Lanza bomba o congela
             if (c.bombas > 0 || c.hielos > 0) {
                 const targetCelda = Math.floor(Math.random() * maxC) + 1;
                 const targetKey = `rojo_${targetCelda}`;
@@ -782,7 +767,6 @@
                         bombasArmadas[targetKey] = { seg: 3, atacante: "Cerebro", lado: 'rojo', celda: targetCelda };
                         notificarAviso(`⚠️ ¡Cerebro plantó una BOMBA 💣 en [${targetCelda}] de ROJO!`);
 
-                        // CONDICIÓN FREEZER.MP3: Cerebro planta bomba en una celda roja congelada que tiene ocupantes adentro
                         const tieneRivalesCongelados = celdasCongeladas[targetKey] && equipoRojo.some(nom => jugadoresData[nom]?.celda === targetCelda && !jugadoresData[nom]?.eliminado);
                         if (tieneRivalesCongelados) {
                             canal.send({ type: 'broadcast', event: 'sonido_freezer', payload: {} });
@@ -801,7 +785,6 @@
                 }
             }
 
-            // E) PATRULLAJE ALEATORIO
             if (Math.random() < 0.35) {
                 const candidatos = [];
                 for (let i = 1; i <= maxC; i++) {
@@ -831,18 +814,14 @@
         }
         reproducirSonido('sndExplosion');
 
-        // 1. Celda vacía: Bloqueo de 7s con 🚫
         if (ocupantes.length === 0) {
             celdasBloqueadas[celdaKey] = { segRestantes: 7 };
             delete itemsSuelo[celdaKey];
             notificarAviso(`💥 ¡Bomba detonó en celda vacía! [${celda}] queda inhabilitada por 7s 🚫.`);
-        } 
-        // 2. Celda con ocupantes: Daño directo (-1 Vida)
-        else {
+        } else {
             ocupantes.forEach(nom => {
                 jugadoresData[nom].vidas--;
 
-                // CONDICIÓN COOLER.MP3: Cerebro pierde sus 3 corazones y queda eliminado
                 if (nom === "Cerebro" && jugadoresData["Cerebro"].vidas <= 0) {
                     canal.send({ type: 'broadcast', event: 'sonido_cooler', payload: {} });
                     reproducirSonido('sndCooler');

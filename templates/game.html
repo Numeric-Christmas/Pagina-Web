@@ -8,16 +8,11 @@
     <audio id="sndClick" preload="auto" src="{{ url_for('static', filename='audio/click.mp3') }}"></audio>
     <audio id="sndCooler" preload="auto" src="{{ url_for('static', filename='audio/cooler.mp3') }}"></audio>
     <audio id="sndFreezer" preload="auto" src="{{ url_for('static', filename='audio/freezer.mp3') }}"></audio>
+    <audio id="sndDuelo" preload="auto" src="{{ url_for('static', filename='audio/duelo.mp3') }}"></audio>
 
     <!-- BLOQUE REGISTRO -->
     <div id="bloqueRegistro">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div style="width: 38px;"></div>
-            <h2 class="fw-bold text-light m-0 fs-4">🎡 Ruleta Rusa: Agresor vs Defensor</h2>
-            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()">
-                🔊
-            </button>
-        </div>
+        <h2 class="fw-bold text-light mb-2 fs-4">🎡 Ruleta Rusa: Agresor vs Defensor</h2>
 
         <div class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura">
             <div class="input-group input-group-sm">
@@ -42,13 +37,18 @@
         </div>
     </div>
 
-    <!-- PANEL ESTADO Y TAMBOR DE BALAS -->
+    <!-- PANEL ESTADO, TAMBOR DE BALAS Y BOTÓN MUTE A LA DERECHA -->
     <div class="d-flex justify-content-between align-items-center mb-2 px-1 flex-wrap gap-2">
         <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold m-0 text-warning text-start flex-grow-1">
             <span id="txtEstado">Esperando participantes...</span>
         </div>
-        <div class="badge bg-danger p-2 fs-6 shadow-sm">
-            🔫 Cartucho: <span id="lblCartuchos">12</span>/12
+        <div class="d-flex align-items-center gap-2">
+            <div class="badge bg-danger p-2 fs-6 shadow-sm">
+                🔫 Cartucho: <span id="lblCartuchos">0</span>/<span id="lblTotalCartuchos">0</span>
+            </div>
+            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
+                🔊
+            </button>
         </div>
     </div>
 
@@ -122,7 +122,6 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content arena-tactica-modal shadow-lg">
             <div class="modal-body p-3 p-md-4 text-center">
-                <!-- ENCABEZADO -->
                 <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-1">
                     <h1 id="lblAgresorTitulo" class="fw-bold m-0 text-danger text-uppercase fs-2">AGRESOR</h1>
                     <span class="fs-2 text-warning">⚡</span>
@@ -376,7 +375,8 @@
     let anguloActual = 0;
     let girando = false;
 
-    let cartuchosRestantes = 12;
+    let cartuchosRestantes = 0;
+    let totalCartuchosInicial = 0;
     let tamborBalas = [];
     let jugadorConBalaActual = null;
     let afectadoConBalaImpacto = null;
@@ -438,6 +438,7 @@
         .on('broadcast', { event: 'jugada_arena' }, (p) => recibirJugadaArena(p.payload))
         .on('broadcast', { event: 'resultado_arena' }, (p) => recibirResultadoArena(p.payload))
         .on('broadcast', { event: 'girar_disparo' }, (p) => animarGiroDisparo(p.payload))
+        .on('broadcast', { event: 'reproducir_audio_global' }, (p) => reproducirSonido(p.payload.id))
         .on('broadcast', { event: 'fin_partida' }, (p) => recibirFinPartida(p.payload))
         .on('broadcast', { event: 'reiniciar' }, () => resetearEstadoLocal())
         .subscribe();
@@ -563,7 +564,7 @@
 
                 let etiquetaTexto = ocupante;
                 if (ocupante === jugadorConBalaActual) {
-                    etiquetaTexto += " 💣";
+                    etiquetaTexto += " 🔫⚔️🔫";
                 }
                 if (ocupante === afectadoConBalaImpacto) {
                     etiquetaTexto += " •";
@@ -602,26 +603,31 @@
             const muerto = d.eliminado || d.vidas <= 0;
             const badgeClass = muerto ? "bg-secondary text-decoration-line-through opacity-50" : "bg-dark border border-secondary";
             const corazones = muerto ? "⚰️" : "❤️".repeat(d.vidas);
-            const tagBala = (nom === jugadorConBalaActual) ? " <span class='badge bg-warning text-dark'>💣 Agresor</span>" : "";
+            const tagBala = (nom === jugadorConBalaActual) ? " <span class='badge bg-warning text-dark'>🔫⚔️🔫 Agresor</span>" : "";
             const tagImpacto = (nom === afectadoConBalaImpacto) ? " <span class='badge bg-danger'>• Herido</span>" : "";
             return `<span class="badge ${badgeClass} p-2">${nom}: ${corazones}${tagBala}${tagImpacto}</span>`;
         }).join('');
     }
 
     // ========================================================
-    // INICIO DE PARTIDA
+    // INICIO DE PARTIDA (4n CARTUCHOS, n-1 VACÍOS)
     // ========================================================
     function iniciarPartida() {
         const vivos = obtenerVivos();
-        if (vivos.length < 2) {
+        const n = vivos.length;
+        if (n < 2) {
             alert("Se requieren al menos 2 combatientes (incluido Cerebro).");
             return;
         }
 
         reorganizarUnaPorcionPorJugador();
 
-        cartuchosRestantes = 12;
-        tamborBalas = new Array(10).fill(true).concat(new Array(2).fill(false));
+        totalCartuchosInicial = 4 * n;
+        cartuchosRestantes = totalCartuchosInicial;
+        const vacios = n - 1;
+        const reales = totalCartuchosInicial - vacios; // 3n + 1
+
+        tamborBalas = new Array(reales).fill(true).concat(new Array(vacios).fill(false));
         tamborBalas.sort(() => Math.random() - 0.5);
 
         const payload = {
@@ -630,6 +636,7 @@
             porciones,
             anguloActual,
             cartuchosRestantes,
+            totalCartuchosInicial,
             tamborBalas
         };
 
@@ -644,6 +651,7 @@
         porciones = data.porciones;
         anguloActual = data.anguloActual;
         cartuchosRestantes = data.cartuchosRestantes;
+        totalCartuchosInicial = data.totalCartuchosInicial;
         tamborBalas = data.tamborBalas;
         afectadoConBalaImpacto = null;
         jugadorConBalaActual = null;
@@ -651,6 +659,7 @@
         document.getElementById('bloqueRegistro').classList.add('d-none');
         document.getElementById('btnIniciarAdmin').disabled = true;
         document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
+        document.getElementById('lblTotalCartuchos').innerText = totalCartuchosInicial;
 
         const snd = document.getElementById('sndFondo');
         if (snd) { snd.currentTime = 0; snd.play().catch(() => {}); }
@@ -685,8 +694,14 @@
 
     function recibirBalaMarcada(data) {
         jugadorConBalaActual = data.agresor;
-        document.getElementById('txtEstado').innerText = `💣 ¡La bala cayó en la porción de ${data.agresor}! Es el Agresor.`;
-        reproducirSonido('sndClick');
+        document.getElementById('txtEstado').innerText = `🔫⚔️🔫 ¡La bala cayó en la porción de ${data.agresor}! Es el Agresor.`;
+
+        // Si Cerebro es asignado agresor para retar, suena freezer.mp3 para todos
+        if (data.agresor === "Cerebro") {
+            reproducirSonido('sndFreezer');
+        } else {
+            reproducirSonido('sndClick');
+        }
 
         dibujarRuleta();
         renderizarListaJugadores();
@@ -743,7 +758,6 @@
         renderizarListaJugadores();
         document.getElementById('txtEstado').innerText = msg;
 
-        // El Administrador ejecuta autoritativamente el giro
         if (esAdmin) {
             sincronizarTodo(msg);
             setTimeout(iniciarGiroRuleta, 2500);
@@ -777,7 +791,6 @@
             canal.send({ type: 'broadcast', event: 'iniciar_arena', payload });
             recibirIniciarArena(payload);
         } else {
-            // Se emite por broadcast para que todos sincronicen y el Admin reanude
             const payloadRechazo = { defensor: dueloInfo.defensor };
             canal.send({ type: 'broadcast', event: 'rechazo_reto', payload: payloadRechazo });
             recibirRechazoReto(payloadRechazo);
@@ -792,7 +805,6 @@
         renderizarListaJugadores();
         document.getElementById('txtEstado').innerText = msg;
 
-        // El Administrador dispara autoritativamente el giro para reanudar el juego
         if (esAdmin) {
             sincronizarTodo(msg);
             setTimeout(iniciarGiroRuleta, 2500);
@@ -800,7 +812,7 @@
     }
 
     // ========================================================
-    // FASE 3: ARENA TÁCTICA (CLIC DIRECTO EN LAS CELDAS)
+    // FASE 3: ARENA TÁCTICA (SONIDO DUELO.MP3 AL ABRIR)
     // ========================================================
     function recibirIniciarArena(data) {
         dueloInfo = data;
@@ -822,6 +834,9 @@
             el.className = 'celda-arena-fila';
             el.querySelector('.fila-contenido').innerHTML = '';
         });
+
+        // Suena duelo.mp3 para todos los dispositivos al abrir la ventana
+        reproducirSonido('sndDuelo');
 
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDueloTactico')).show();
 
@@ -973,7 +988,7 @@
             if (esAdmin) {
                 setTimeout(iniciarGiroRuleta, 2000);
             }
-        }, 4000);
+        }, 5000);
     }
 
     function recibirResultadoArena(p) {
@@ -1048,7 +1063,6 @@
         const vueltas = (Math.floor(Math.random() * 4) + 4) * (Math.PI * 2);
         const anguloObjetivo = vueltas - (indiceDestino * sectorRad) - (sectorRad / 2);
 
-        // Descuento único y autoritativo del Admin
         cartuchosRestantes--;
         const tieneBala = tamborBalas.pop() || false;
 
@@ -1069,7 +1083,6 @@
         afectadoConBalaImpacto = null;
         document.getElementById('txtEstado').innerText = "🎡 La ruleta está girando...";
 
-        // Se sincroniza el cartucho exacto que emitió el host para todas las pantallas
         cartuchosRestantes = data.cartuchosRestantes;
         document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
 
@@ -1111,7 +1124,6 @@
         if (data.tieneBala) {
             reproducirSonido('sndDisparo');
             if (ocupante && jugadoresData[ocupante] && !jugadoresData[ocupante].eliminado) {
-                // SOLO EL ADMIN descuenta exactamente 1 corazón
                 if (esAdmin) {
                     jugadoresData[ocupante].vidas = Math.max(0, jugadoresData[ocupante].vidas - 1);
                     if (jugadoresData[ocupante].vidas <= 0) {
@@ -1121,6 +1133,14 @@
 
                 afectadoConBalaImpacto = ocupante;
                 mensaje = `💥 ¡BANG! Había bala en el cartucho. Impactó a ${ocupante} • (-1 ❤️).`;
+
+                // Si Cerebro pierde su último corazón, suena cooler.mp3 para todos
+                if (ocupante === "Cerebro" && jugadoresData["Cerebro"].vidas <= 0) {
+                    if (esAdmin) {
+                        canal.send({ type: 'broadcast', event: 'reproducir_audio_global', payload: { id: 'sndCooler' } });
+                    }
+                    reproducirSonido('sndCooler');
+                }
 
                 if (jugadoresData[ocupante].vidas <= 0) {
                     mensaje += ` ⚰️ ${ocupante} ha sido eliminado.`;
@@ -1136,7 +1156,6 @@
         dibujarRuleta();
         renderizarListaJugadores();
 
-        // El Admin sincroniza el estado oficial con 1 sola vida descontada
         if (esAdmin) {
             sincronizarTodo(mensaje);
 
@@ -1177,6 +1196,7 @@
                 jugadoresData,
                 porciones,
                 cartuchosRestantes,
+                totalCartuchosInicial,
                 anguloActual,
                 jugadorConBalaActual,
                 afectadoConBalaImpacto,
@@ -1189,6 +1209,7 @@
         jugadoresData = p.jugadoresData || jugadoresData;
         porciones = p.porciones || porciones;
         cartuchosRestantes = (p.cartuchosRestantes !== undefined) ? p.cartuchosRestantes : cartuchosRestantes;
+        totalCartuchosInicial = (p.totalCartuchosInicial !== undefined) ? p.totalCartuchosInicial : totalCartuchosInicial;
         anguloActual = (p.anguloActual !== undefined) ? p.anguloActual : anguloActual;
         jugadorConBalaActual = p.jugadorConBalaActual;
         afectadoConBalaImpacto = p.afectadoConBalaImpacto;
@@ -1196,6 +1217,7 @@
         forzarCierreModalDuelo();
 
         document.getElementById('lblCartuchos').innerText = cartuchosRestantes;
+        document.getElementById('lblTotalCartuchos').innerText = totalCartuchosInicial;
         if (p.textoAviso) {
             document.getElementById('txtEstado').innerText = p.textoAviso;
         }
@@ -1216,8 +1238,8 @@
             tit = "💀 EMPATE TOTAL";
             sub = "Todos los combatientes han caído.";
         } else if (cartuchosRestantes <= 0) {
-            tit = "🏁 FIN DE LOS 12 CARTUCHOS";
-            sub = `Se agotaron los 12 cartuchos. Sobrevivientes: ${vivos.join(', ')}.`;
+            tit = "🏁 FIN DE LOS CARTUCHOS";
+            sub = `Se agotaron los cartuchos del tambor. Sobrevivientes: ${vivos.join(', ')}.`;
         } else {
             return false;
         }
@@ -1256,7 +1278,8 @@
         porciones = [];
         anguloActual = 0;
         girando = false;
-        cartuchosRestantes = 12;
+        cartuchosRestantes = 0;
+        totalCartuchosInicial = 0;
         tamborBalas = [];
         jugadorConBalaActual = null;
         afectadoConBalaImpacto = null;
@@ -1274,7 +1297,8 @@
         document.getElementById('msgConfirmacion').classList.add('d-none');
         document.getElementById('btnIniciarAdmin').disabled = false;
         document.getElementById('txtEstado').innerText = "Esperando participantes...";
-        document.getElementById('lblCartuchos').innerText = "12";
+        document.getElementById('lblCartuchos').innerText = "0";
+        document.getElementById('lblTotalCartuchos').innerText = "0";
 
         renderizarListaJugadores();
         dibujarRuleta();
