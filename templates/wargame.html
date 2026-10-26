@@ -335,8 +335,12 @@
                 else equipoAzul.push(p.nombre);
             });
 
+            // Solo si la cantidad de humanos es impar, entra Cerebro a completar
             if (data.length > 0 && data.length % 2 !== 0) {
                 equipoAzul.push("Cerebro");
+            } else {
+                // Si la cantidad es par, nos aseguramos de purgar a Cerebro
+                delete jugadoresData["Cerebro"];
             }
 
             if (miNombre) {
@@ -627,11 +631,12 @@
     }
 
     // ========================================================
-    // CICLOS DEL TIEMPO (ADMIN: 5s SUMINISTROS Y CEREBRO)
+    // CICLOS DEL TIEMPO (ADMIN: SUMINISTROS Y CEREBRO)
     // ========================================================
     function iniciarCiclosGlobales() {
         if (!esAdmin) return;
 
+        // 1. Generador de suministros
         clearInterval(loopGeneradorItems);
         loopGeneradorItems = setInterval(() => {
             if (!partidaEnCurso) return;
@@ -656,6 +661,7 @@
             sincronizarEstado();
         }, 5000);
 
+        // 2. Cronómetros de tableros
         clearInterval(loopCronometroCeldas);
         loopCronometroCeldas = setInterval(() => {
             if (!partidaEnCurso) return;
@@ -702,9 +708,15 @@
             if (huboCambios) sincronizarEstado();
         }, 1000);
 
+        // 3. IA de Cerebro (SOLO SE EJECUTA SI CEREBRO ESTÁ PARTICIPANDO EN UN EQUIPO)
         clearInterval(loopIaCerebro);
         loopIaCerebro = setInterval(() => {
             if (!partidaEnCurso) return;
+
+            // VALIDACIÓN ESTRICTA: Cerebro solo actúa si está en equipoRojo o equipoAzul
+            const cerebroEnJuego = equipoRojo.includes("Cerebro") || equipoAzul.includes("Cerebro");
+            if (!cerebroEnJuego) return;
+
             const c = jugadoresData["Cerebro"];
             if (!c || c.eliminado) return;
 

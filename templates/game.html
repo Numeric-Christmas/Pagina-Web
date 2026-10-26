@@ -37,18 +37,13 @@
         </div>
     </div>
 
-    <!-- PANEL ESTADO, TAMBOR DE BALAS Y BOTÓN MUTE A LA DERECHA -->
+    <!-- PANEL ESTADO Y TAMBOR DE BALAS -->
     <div class="d-flex justify-content-between align-items-center mb-2 px-1 flex-wrap gap-2">
         <div id="panelEstado" class="alert alert-dark border-secondary py-1 px-3 small fw-bold m-0 text-warning text-start flex-grow-1">
             <span id="txtEstado">Esperando participantes...</span>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <div class="badge bg-danger p-2 fs-6 shadow-sm">
-                🔫 Cartucho: <span id="lblCartuchos">0</span>/<span id="lblTotalCartuchos">0</span>
-            </div>
-            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-1" style="width: 36px; height: 36px;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
-                🔊
-            </button>
+        <div class="badge bg-danger p-2 fs-6 shadow-sm">
+            🔫 Cartucho: <span id="lblCartuchos">0</span>/<span id="lblTotalCartuchos">0</span>
         </div>
     </div>
 
@@ -60,11 +55,16 @@
         </div>
     </div>
 
-    <!-- LISTA DE COMBATIENTES -->
+    <!-- LISTA DE COMBATIENTES CON BOTÓN DE AUDIO PEGADO A LA DERECHA -->
     <div class="card p-2 shadow-sm border border-secondary rounded-3 bg-tarjeta-oscura text-start my-2">
-        <span class="fw-bold small text-white text-uppercase d-block mb-1 border-bottom border-secondary pb-1" style="font-size: 0.8rem;">
-            Combatientes en Juego
-        </span>
+        <div class="d-flex justify-content-between align-items-center mb-1 border-bottom border-secondary pb-1">
+            <span class="fw-bold small text-white text-uppercase" style="font-size: 0.8rem;">
+                Combatientes en Juego
+            </span>
+            <button id="btnMuteMusica" class="btn btn-outline-secondary btn-sm rounded-circle p-0" style="width: 30px; height: 30px; font-size: 0.85rem;" onclick="toggleMuteMusica()" title="Silenciar / Activar Música">
+                🔊
+            </button>
+        </div>
         <div id="listaJugadores" class="d-flex flex-wrap gap-2 justify-content-center py-1"></div>
     </div>
 </div>
@@ -122,6 +122,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content arena-tactica-modal shadow-lg">
             <div class="modal-body p-3 p-md-4 text-center">
+                <!-- ENCABEZADO -->
                 <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-1">
                     <h1 id="lblAgresorTitulo" class="fw-bold m-0 text-danger text-uppercase fs-2">AGRESOR</h1>
                     <span class="fs-2 text-warning">⚡</span>
@@ -186,10 +187,10 @@
 
                 <div id="lblEstadoEleccionPersonal" class="small text-info mb-2 fw-bold"></div>
 
-                <!-- CUADRO RESULTADO (SINCRONIZADO PARA TODOS) -->
+                <!-- CUADRO RESULTADO (ALTO CONTRASTE Y LEGIBILIDAD) -->
                 <div id="cuadroResultadoDuelo" class="cuadro-resultado-duelo d-none">
-                    <h5 id="resumenDueloTitulo" class="fw-bold text-warning mb-1"></h5>
-                    <div id="resumenDueloDetalle" class="small text-start px-2"></div>
+                    <h5 id="resumenDueloTitulo" class="fw-bold text-warning mb-2"></h5>
+                    <div id="resumenDueloDetalle" class="small text-start px-2 text-white"></div>
                 </div>
             </div>
         </div>
@@ -336,12 +337,22 @@
         filter: drop-shadow(0 0 6px rgba(255,255,255,0.3));
     }
 
+    /* Cuadro de resultado con fondo aclarado y textos de alto contraste */
     .cuadro-resultado-duelo {
-        border: 1.5px solid #ffc107;
-        background: #131720;
-        border-radius: 10px;
-        padding: 12px;
-        box-shadow: 0 0 14px rgba(255, 193, 7, 0.2);
+        border: 2px solid #ffc107;
+        background: #1a202c !important;
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 0 16px rgba(255, 193, 7, 0.35);
+    }
+
+    .item-desglose-duelo {
+        background: #11151f;
+        border-left: 4px solid #ffc107;
+        padding: 8px 10px;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        font-size: 0.9rem;
     }
 
     #pantallaVictoria {
@@ -625,7 +636,7 @@
         totalCartuchosInicial = 4 * n;
         cartuchosRestantes = totalCartuchosInicial;
         const vacios = n - 1;
-        const reales = totalCartuchosInicial - vacios; // 3n + 1
+        const reales = totalCartuchosInicial - vacios;
 
         tamborBalas = new Array(reales).fill(true).concat(new Array(vacios).fill(false));
         tamborBalas.sort(() => Math.random() - 0.5);
@@ -696,7 +707,6 @@
         jugadorConBalaActual = data.agresor;
         document.getElementById('txtEstado').innerText = `🔫⚔️🔫 ¡La bala cayó en la porción de ${data.agresor}! Es el Agresor.`;
 
-        // Si Cerebro es asignado agresor para retar, suena freezer.mp3 para todos
         if (data.agresor === "Cerebro") {
             reproducirSonido('sndFreezer');
         } else {
@@ -812,7 +822,7 @@
     }
 
     // ========================================================
-    // FASE 3: ARENA TÁCTICA (SONIDO DUELO.MP3 AL ABRIR)
+    // FASE 3: ARENA TÁCTICA (CLIC DIRECTO EN LAS CELDAS)
     // ========================================================
     function recibirIniciarArena(data) {
         dueloInfo = data;
@@ -835,9 +845,7 @@
             el.querySelector('.fila-contenido').innerHTML = '';
         });
 
-        // Suena duelo.mp3 para todos los dispositivos al abrir la ventana
         reproducirSonido('sndDuelo');
-
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalDueloTactico')).show();
 
         if (esAdmin && (data.agresor === "Cerebro" || data.defensor === "Cerebro")) {
@@ -864,12 +872,25 @@
 
         const miColumnaPropia = soyAgresor ? 1 : 2;
         const colRival = soyAgresor ? 2 : 1;
+        const miColorBadge = soyAgresor ? 'bg-danger' : 'bg-primary';
 
         if (columna === miColumnaPropia) {
             miEleccionDuelo.pos = fila;
-            document.getElementById(`celda_col${columna}_1`).classList.remove('celda-cobertura-propia');
-            document.getElementById(`celda_col${columna}_2`).classList.remove('celda-cobertura-propia');
-            document.getElementById(`celda_col${columna}_${fila}`).classList.add('celda-cobertura-propia');
+
+            // Limpia estilos y contenidos en la columna propia de este jugador
+            const c1 = document.getElementById(`celda_col${columna}_1`);
+            const c2 = document.getElementById(`celda_col${columna}_2`);
+            c1.classList.remove('celda-cobertura-propia');
+            c2.classList.remove('celda-cobertura-propia');
+            c1.querySelector('.fila-contenido').innerHTML = '';
+            c2.querySelector('.fila-contenido').innerHTML = '';
+
+            // Muestra inmediatamente el nombre SOLO en su propio dispositivo
+            const cElegida = document.getElementById(`celda_col${columna}_${fila}`);
+            cElegida.classList.add('celda-cobertura-propia');
+            cElegida.querySelector('.fila-contenido').innerHTML = `
+                <span class="badge ${miColorBadge} badge-combatiente-arena animate__animated animate__fadeIn">${miNombre}</span>
+            `;
         } else if (columna === colRival) {
             miEleccionDuelo.disp = fila;
             document.getElementById(`celda_col${columna}_1`).classList.remove('celda-disparo-objetivo');
@@ -935,9 +956,9 @@
         if (j1Acierta && j2Acierta) {
             tituloHtml = `💥 ¡FUEGO CRUZADO! Ambos acertaron con sus pistolas 🔫.`;
             resumenTexto = `
-                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (ACERTÓ 🎯)</div>
-                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (ACERTÓ 🎯)</div>
-                <div class="text-warning mt-1 fw-bold">Ambos jugadores tendrán un total de 2 porciones en la ruleta.</div>
+                <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
+                <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
+                <div class="text-warning mt-2 fw-bold text-center">⚔️ Ambos jugadores tendrán un total de 2 porciones en la ruleta.</div>
             `;
             asegurarTotalPorciones(agresor, 2);
             asegurarTotalPorciones(defensor, 2);
@@ -945,25 +966,26 @@
             perdedorUnico = defensor;
             tituloHtml = `🎯 ¡IMPACTO CERTERO! El Agresor ${agresor} acertó su disparo 🔫.`;
             resumenTexto = `
-                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (ACERTÓ 🎯)</div>
-                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (FALLÓ 💨)</div>
-                <div class="text-danger mt-1 fw-bold">${defensor} tendrá 3 porciones en la ruleta.</div>
+                <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
+                <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
+                <div class="text-danger mt-2 fw-bold text-center">💀 ${defensor} pierde el duelo y tendrá 3 porciones en la ruleta.</div>
             `;
             asegurarTotalPorciones(perdedorUnico, 3);
         } else if (j2Acierta) {
             perdedorUnico = agresor;
             tituloHtml = `🎯 ¡IMPACTO CERTERO! El Defensor ${defensor} repelió y acertó 🔫.`;
             resumenTexto = `
-                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (FALLÓ 💨)</div>
-                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (ACERTÓ 🎯)</div>
-                <div class="text-danger mt-1 fw-bold">${agresor} tendrá 3 porciones en la ruleta.</div>
+                <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
+                <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
+                <div class="text-danger mt-2 fw-bold text-center">💀 ${agresor} pierde el duelo y tendrá 3 porciones en la ruleta.</div>
             `;
             asegurarTotalPorciones(perdedorUnico, 3);
         } else {
             tituloHtml = `💨 ¡AMBOS FALLARON! Disparos a trincheras vacías 🔫.`;
             resumenTexto = `
-                <div class="mb-1">🔴 <strong>${agresor} (Agresor)</strong>: Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (FALLÓ 💨)</div>
-                <div>🔵 <strong>${defensor} (Defensor)</strong>: Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (FALLÓ 💨)</div>
+                <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
+                <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
+                <div class="text-info mt-2 fw-bold text-center">Nadie recibe porciones adicionales.</div>
             `;
         }
 
@@ -997,21 +1019,23 @@
             if (el) el.querySelector('.fila-contenido').innerHTML = '';
         });
 
+        // 1. Revelar Coberturas de ambos jugadores en todos los dispositivos
         const celdaCobAgresor = document.getElementById(`celda_col1_${p.j1.pos}`);
         const celdaCobDefensor = document.getElementById(`celda_col2_${p.j2.pos}`);
 
         if (celdaCobAgresor) {
             celdaCobAgresor.querySelector('.fila-contenido').innerHTML = `
-                <span class="badge bg-danger badge-combatiente-arena">${p.agresor}</span>
+                <span class="badge bg-danger badge-combatiente-arena animate__animated animate__fadeIn">${p.agresor}</span>
             `;
         }
 
         if (celdaCobDefensor) {
             celdaCobDefensor.querySelector('.fila-contenido').innerHTML = `
-                <span class="badge bg-primary badge-combatiente-arena">${p.defensor}</span>
+                <span class="badge bg-primary badge-combatiente-arena animate__animated animate__fadeIn">${p.defensor}</span>
             `;
         }
 
+        // 2. Disparos e Impactos
         const celdaDispAgresor = document.getElementById(`celda_col2_${p.j1.disp}`);
         if (celdaDispAgresor) {
             const cont = celdaDispAgresor.querySelector('.fila-contenido');
@@ -1030,6 +1054,7 @@
             }
         }
 
+        // 3. Cuadro de texto dorado con fondo aclarado y textos de alto contraste
         const cuadroRes = document.getElementById('cuadroResultadoDuelo');
         const tituloRes = document.getElementById('resumenDueloTitulo');
         const detalleRes = document.getElementById('resumenDueloDetalle');
@@ -1134,7 +1159,6 @@
                 afectadoConBalaImpacto = ocupante;
                 mensaje = `💥 ¡BANG! Había bala en el cartucho. Impactó a ${ocupante} • (-1 ❤️).`;
 
-                // Si Cerebro pierde su último corazón, suena cooler.mp3 para todos
                 if (ocupante === "Cerebro" && jugadoresData["Cerebro"].vidas <= 0) {
                     if (esAdmin) {
                         canal.send({ type: 'broadcast', event: 'reproducir_audio_global', payload: { id: 'sndCooler' } });
