@@ -43,12 +43,18 @@
         <span id="txtEstado">Esperando combatientes...</span>
     </div>
 
-    <!-- Barra de Inventario Personal -->
+    <!-- Barra de Inventario Personal con Botón de Fuego -->
     <div id="panelMiInventario" class="card p-2 shadow-sm border border-secondary rounded-3 mb-2 bg-tarjeta-oscura text-light d-none">
-        <div class="d-flex justify-content-around align-items-center small flex-wrap px-1">
+        <div class="d-flex justify-content-around align-items-center small flex-wrap px-1 gap-2">
             <span>❤️ <strong id="invVidas" class="text-danger">3</strong>/3</span>
             <span>💣 <strong id="invBombas" class="text-danger">0</strong>/3</span>
             <span>🧊 <strong id="invHielos" class="text-info">0</strong>/3</span>
+            <span class="d-inline-flex align-items-center gap-1">
+                🔥 <strong id="invFuegos" class="text-warning">3</strong>/3
+                <button id="btnUsarFuego" class="btn btn-warning btn-sm px-2 py-0 fw-bold ms-1" style="font-size: 0.75rem;" onclick="usarFuegoDescongelar()">
+                    Usar
+                </button>
+            </span>
         </div>
     </div>
 
@@ -260,7 +266,7 @@
     const TOPE_POR_ARTICULO = 3;
 
     let miNombre = "";
-    let miEquipo = ""; // 'rojo' o 'azul'
+    let miEquipo = "";
     let esAdmin = false;
     let partidaEnCurso = false;
     let estoyEliminado = false;
@@ -269,10 +275,10 @@
     let equipoAzul = [];
     let jugadoresData = {};
 
-    let itemsSuelo = {};           // { 'rojo_1': { tipo: 'bomba', expiraEn: 5 }, ... }
-    let bombasArmadas = {};        // { 'rojo_1': { seg: 3, atacante: '...' } }
-    let celdasCongeladas = {};     // { 'rojo_1': { segRestantes: 7 } }
-    let celdasBloqueadas = {};     // { 'rojo_1': { segRestantes: 7 } }
+    let itemsSuelo = {};
+    let bombasArmadas = {};
+    let celdasCongeladas = {};
+    let celdasBloqueadas = {};
 
     let loopGeneradorItems = null;
     let loopCronometroCeldas = null;
@@ -313,6 +319,7 @@
         .on('broadcast', { event: 'nuevo_participante' }, () => cargarParticipantes())
         .on('broadcast', { event: 'iniciar_partida' }, () => recibirInicioPartida())
         .on('broadcast', { event: 'sincronizar_estado' }, (p) => recibirSincronizacion(p.payload))
+        .on('broadcast', { event: 'usar_fuego' }, (p) => recibirUsoFuego(p.payload))
         .on('broadcast', { event: 'aviso_global' }, (p) => mostrarAviso(p.payload.texto))
         .on('broadcast', { event: 'sonido_cooler' }, () => reproducirSonido('sndCooler'))
         .on('broadcast', { event: 'sonido_freezer' }, () => reproducirSonido('sndFreezer'))
@@ -335,11 +342,9 @@
                 else equipoAzul.push(p.nombre);
             });
 
-            // Solo si la cantidad de humanos es impar, entra Cerebro a completar
             if (data.length > 0 && data.length % 2 !== 0) {
                 equipoAzul.push("Cerebro");
             } else {
-                // Si la cantidad es par, nos aseguramos de purgar a Cerebro
                 delete jugadoresData["Cerebro"];
             }
 
@@ -354,6 +359,7 @@
                         vidas: 3,
                         bombas: 0,
                         hielos: 0,
+                        fuegos: 3,
                         eliminado: false
                     };
                 }
@@ -475,16 +481,16 @@
             const esMiMismoBando = (miEquipo === ladoEquipo);
 
             ul.innerHTML = lista.map(nom => {
-                const d = jugadoresData[nom] || { vidas: 3, eliminado: false, bombas: 0, hielos: 0 };
+                const d = jugadoresData[nom] || { vidas: 3, eliminado: false, bombas: 0, hielos: 0, fuegos: 3 };
                 if (d.eliminado || d.vidas <= 0) {
                     return `<li class="py-1 border-bottom border-secondary texto-caido"><span class="text-decoration-line-through">⚰️ ${nom}</span></li>`;
                 }
 
                 let datosInventario = "";
                 if (esMiMismoBando) {
-                    datosInventario = `(❤️${d.vidas} 💣${d.bombas}/3 🧊${d.hielos}/3)`;
+                    datosInventario = `(❤️${d.vidas} 💣${d.bombas}/3 🧊${d.hielos}/3 🔥${d.fuegos}/3)`;
                 } else {
-                    datosInventario = `(❤️${d.vidas} 💣? 🧊?)`;
+                    datosInventario = `(❤️${d.vidas} 💣? 🧊? 🔥?)`;
                 }
 
                 return `
@@ -506,6 +512,53 @@
         document.getElementById('invVidas').innerText = d.vidas;
         document.getElementById('invBombas').innerText = d.bombas;
         document.getElementById('invHielos').innerText = d.hielos;
+        document.getElementById('invFuegos').innerText = d.fuegos;
+
+        const btnFuego = document.getElementById('btnUsarFuego');
+        if (btnFuego) {
+            btnFuego.disabled = (d.fuegos <= 0 || !partidaEnCurso || estoyEliminado);
+        }
+    }
+
+    // ========================================================
+    // USO DEL FUEGO (DESCUENTO ESTRICTO DE 1 EN 1)
+    // ========================================================
+    function usarFuegoDescongelar() {
+        if (!partidaEnCurso || estoyEliminado) return;
+        const dMio = jugadoresData[miNombre];
+        if (!dMio || dMio.fuegos <= 0) return;
+
+        const miLado = miEquipo;
+        const miNivel = dMio.celda;
+        const celdaKey = `${miLado}_${miNivel}`;
+
+        if (!celdasCongeladas[celdaKey]) {
+            mostrarAviso("ℹ️ Tu trinchera no está congelada.");
+            return;
+        }
+
+        const payload = {
+            jugador: miNombre,
+            lado: miLado,
+            celda: miNivel,
+            celdaKey: celdaKey
+        };
+
+        canal.send({ type: 'broadcast', event: 'usar_fuego', payload });
+        recibirUsoFuego(payload);
+    }
+
+    function recibirUsoFuego(p) {
+        delete celdasCongeladas[p.celdaKey];
+
+        if (jugadoresData[p.jugador] && jugadoresData[p.jugador].fuegos > 0) {
+            jugadoresData[p.jugador].fuegos = Math.max(0, jugadoresData[p.jugador].fuegos - 1);
+        }
+
+        reproducirSonido('sndClick');
+        actualizarMiInventarioUI();
+        notificarAviso(`🔥 ¡${p.jugador} usó Fuego y descongeló la trinchera [${p.celda}] de ${p.lado.toUpperCase()}!`);
+        sincronizarEstado();
     }
 
     // ========================================================
@@ -523,7 +576,7 @@
 
         const celdaActualKey = `${miEquipo}_${jugadoresData[miNombre].celda}`;
         if (celdasCongeladas[celdaActualKey]) {
-            mostrarAviso("🧊 ¡Estás congelado! No puedes moverte.");
+            mostrarAviso("🧊 ¡Estás congelado! Usa tu 🔥 o aguanta los 7s completos para recibir +1 🔥.");
             return;
         }
 
@@ -572,7 +625,7 @@
 
             const celdaActualKey = `${miEquipo}_${dMio.celda}`;
             if (celdasCongeladas[celdaActualKey]) {
-                mostrarAviso("🧊 ¡Estás congelado! No puedes atacar.");
+                mostrarAviso("🧊 ¡Estás congelado! Usa tu 🔥 para liberarte y poder atacar.");
                 return;
             }
 
@@ -623,7 +676,18 @@
         } else if (tipoProyectil === 'hielo') {
             if (dMio.hielos <= 0) return;
             dMio.hielos--;
-            celdasCongeladas[celdaKey] = { segRestantes: 7 };
+
+            // Guardar con precisión quiénes estaban presentes en el instante inicial
+            const equipoRival = (lado === 'rojo') ? equipoRojo : equipoAzul;
+            const presentesAlInicio = equipoRival.filter(nom => jugadoresData[nom]?.celda === celda && !jugadoresData[nom]?.eliminado);
+
+            celdasCongeladas[celdaKey] = {
+                segRestantes: 7,
+                lado: lado,
+                celda: celda,
+                afectadosIniciales: presentesAlInicio
+            };
+
             notificarAviso(`🧊 ¡${miNombre} congeló la celda [${celda}] del rival por 7s!`);
         }
 
@@ -631,7 +695,7 @@
     }
 
     // ========================================================
-    // CICLOS DEL TIEMPO (ADMIN: SUMINISTROS Y CEREBRO)
+    // CICLOS DEL TIEMPO (ADMIN: RECARGA DE FUEGO SÓLO SI PERMANECE LOS 7s)
     // ========================================================
     function iniciarCiclosGlobales() {
         if (!esAdmin) return;
@@ -644,14 +708,12 @@
             const tipos = ['bomba', 'hielo'];
             const maxC = obtenerTotalCeldas();
 
-            // Suministro ROJO
             const celdaRojo = Math.floor(Math.random() * maxC) + 1;
             const keyRojo = `rojo_${celdaRojo}`;
             if (!celdasBloqueadas[keyRojo] && !itemsSuelo[keyRojo]) {
                 itemsSuelo[keyRojo] = { tipo: tipos[Math.floor(Math.random() * tipos.length)], expiraEn: 5 };
             }
 
-            // Suministro AZUL
             const celdaAzul = Math.floor(Math.random() * maxC) + 1;
             const keyAzul = `azul_${celdaAzul}`;
             if (!celdasBloqueadas[keyAzul] && !itemsSuelo[keyAzul]) {
@@ -691,8 +753,36 @@
                 celdasCongeladas[k].segRestantes--;
                 huboCambios = true;
                 if (celdasCongeladas[k].segRestantes <= 0) {
+                    const congelacion = celdasCongeladas[k];
+                    const partes = k.split('_');
+                    const ladoCongelado = partes[0];
+                    const numCeldaCongelada = parseInt(partes[1]);
+                    const equipoAfectado = (ladoCongelado === 'rojo') ? equipoRojo : equipoAzul;
+
+                    // VALIDACIÓN ESTRICTA: Sólo quienes estuvieron congelados desde el segundo inicial
+                    // y continuaron en esa celda hasta los 7 segundos completos reciben +1 Fuego
+                    const listaInicial = congelacion.afectadosIniciales || [];
+                    let beneficiados = [];
+
+                    listaInicial.forEach(nom => {
+                        const d = jugadoresData[nom];
+                        // Sigue vivo, sigue en la celda y pertenecía al inicio del hielo
+                        if (d && !d.eliminado && d.celda === numCeldaCongelada) {
+                            if (d.fuegos === undefined) d.fuegos = 3;
+                            if (d.fuegos < TOPE_POR_ARTICULO) {
+                                d.fuegos++;
+                                beneficiados.push(nom);
+                            }
+                        }
+                    });
+
                     delete celdasCongeladas[k];
-                    notificarAviso(`☀️ ¡El hielo se derritió en la celda ${k.toUpperCase()}!`);
+
+                    if (beneficiados.length > 0) {
+                        notificarAviso(`☀️ ¡Hielo derretido en [${numCeldaCongelada}] de ${ladoCongelado.toUpperCase()}! ${beneficiados.join(', ')} aguantó los 7s completos y recibió +1 🔥.`);
+                    } else {
+                        notificarAviso(`☀️ ¡El hielo se derritió en la celda [${numCeldaCongelada}] de ${ladoCongelado.toUpperCase()}!`);
+                    }
                 }
             });
 
@@ -708,12 +798,11 @@
             if (huboCambios) sincronizarEstado();
         }, 1000);
 
-        // 3. IA de Cerebro (SOLO SE EJECUTA SI CEREBRO ESTÁ PARTICIPANDO EN UN EQUIPO)
+        // 3. IA de Cerebro
         clearInterval(loopIaCerebro);
         loopIaCerebro = setInterval(() => {
             if (!partidaEnCurso) return;
 
-            // VALIDACIÓN ESTRICTA: Cerebro solo actúa si está en equipoRojo o equipoAzul
             const cerebroEnJuego = equipoRojo.includes("Cerebro") || equipoAzul.includes("Cerebro");
             if (!cerebroEnJuego) return;
 
@@ -723,11 +812,32 @@
             const maxC = obtenerTotalCeldas();
             const miKey = `azul_${c.celda}`;
 
-            if (celdasCongeladas[miKey]) {
+            const estaCongelado = !!celdasCongeladas[miKey];
+            const hayBombaInminente = !!bombasArmadas[miKey];
+
+            // Cerebro solo gasta su fuego si está congelado y tiene una bomba a punto de estallar
+            if (estaCongelado && hayBombaInminente && c.fuegos > 0) {
+                c.fuegos--;
+                delete celdasCongeladas[miKey];
+                notificarAviso(`🔥 ¡Cerebro estaba acorralado por una bomba, usó su Fuego y escapó a tiempo!`);
+
+                const celdasSeguras = [];
+                for (let i = 1; i <= maxC; i++) {
+                    const k = `azul_${i}`;
+                    if (!bombasArmadas[k] && !celdasBloqueadas[k]) celdasSeguras.push(i);
+                }
+                if (celdasSeguras.length > 0) {
+                    c.celda = celdasSeguras[Math.floor(Math.random() * celdasSeguras.length)];
+                }
+                sincronizarEstado();
                 return;
             }
 
-            if (bombasArmadas[miKey]) {
+            if (estaCongelado) {
+                return;
+            }
+
+            if (hayBombaInminente) {
                 const celdasSeguras = [];
                 for (let i = 1; i <= maxC; i++) {
                     const k = `azul_${i}`;
@@ -789,7 +899,16 @@
                         return;
                     } else if (c.hielos > 0) {
                         c.hielos--;
-                        celdasCongeladas[targetKey] = { segRestantes: 7 };
+
+                        const presentesRojo = equipoRojo.filter(nom => jugadoresData[nom]?.celda === targetCelda && !jugadoresData[nom]?.eliminado);
+
+                        celdasCongeladas[targetKey] = {
+                            segRestantes: 7,
+                            lado: 'rojo',
+                            celda: targetCelda,
+                            afectadosIniciales: presentesRojo
+                        };
+
                         notificarAviso(`🧊 ¡Cerebro congeló la celda [${targetCelda}] de ROJO por 7s!`);
                         sincronizarEstado();
                         return;
