@@ -104,7 +104,7 @@
                     El Agresor <strong id="lblAgresorNombre" class="text-danger"></strong> te ha seleccionado como Defensor.
                 </p>
                 <div class="small text-muted mb-3" style="font-size: 0.72rem;">
-                    * Si aceptas y pierdes, tendrás un total de <strong>3 porciones</strong>.<br>
+                    * Si aceptas y pierdes, tu nombre ocupará <strong>todas las porciones vacías</strong>.<br>
                     * Si ambos aciertan, ambos tendrán un total de <strong>2 porciones</strong>.<br>
                     * Si rechazas, tendrás un total de <strong>2 porciones</strong> de inmediato.
                 </div>
@@ -122,7 +122,6 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content arena-tactica-modal shadow-lg">
             <div class="modal-body p-3 p-md-4 text-center">
-                <!-- ENCABEZADO -->
                 <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-1">
                     <h1 id="lblAgresorTitulo" class="fw-bold m-0 text-danger text-uppercase fs-2">AGRESOR</h1>
                     <span class="fs-2 text-warning">⚡</span>
@@ -187,7 +186,7 @@
 
                 <div id="lblEstadoEleccionPersonal" class="small text-info mb-2 fw-bold"></div>
 
-                <!-- CUADRO RESULTADO (ALTO CONTRASTE Y LEGIBILIDAD) -->
+                <!-- CUADRO RESULTADO (ALTO CONTRASTE) -->
                 <div id="cuadroResultadoDuelo" class="cuadro-resultado-duelo d-none">
                     <h5 id="resumenDueloTitulo" class="fw-bold text-warning mb-2"></h5>
                     <div id="resumenDueloDetalle" class="small text-start px-2 text-white"></div>
@@ -337,7 +336,6 @@
         filter: drop-shadow(0 0 6px rgba(255,255,255,0.3));
     }
 
-    /* Cuadro de resultado con fondo aclarado y textos de alto contraste */
     .cuadro-resultado-duelo {
         border: 2px solid #ffc107;
         background: #1a202c !important;
@@ -877,7 +875,7 @@
         if (columna === miColumnaPropia) {
             miEleccionDuelo.pos = fila;
 
-            // Limpia estilos y contenidos en la columna propia de este jugador
+            // Limpia clases y contenidos previos en la columna propia
             const c1 = document.getElementById(`celda_col${columna}_1`);
             const c2 = document.getElementById(`celda_col${columna}_2`);
             c1.classList.remove('celda-cobertura-propia');
@@ -893,9 +891,21 @@
             `;
         } else if (columna === colRival) {
             miEleccionDuelo.disp = fila;
-            document.getElementById(`celda_col${columna}_1`).classList.remove('celda-disparo-objetivo');
-            document.getElementById(`celda_col${columna}_2`).classList.remove('celda-disparo-objetivo');
-            document.getElementById(`celda_col${columna}_${fila}`).classList.add('celda-disparo-objetivo');
+
+            // Limpia clases y contenidos previos en la columna del oponente
+            const cr1 = document.getElementById(`celda_col${columna}_1`);
+            const cr2 = document.getElementById(`celda_col${columna}_2`);
+            cr1.classList.remove('celda-disparo-objetivo');
+            cr2.classList.remove('celda-disparo-objetivo');
+            cr1.querySelector('.fila-contenido').innerHTML = '';
+            cr2.querySelector('.fila-contenido').innerHTML = '';
+
+            // Muestra inmediatamente la pistola SOLO en su propio dispositivo
+            const crElegida = document.getElementById(`celda_col${columna}_${fila}`);
+            crElegida.classList.add('celda-disparo-objetivo');
+            crElegida.querySelector('.fila-contenido').innerHTML = `
+                <span class="fs-6 animate__animated animate__fadeIn" title="Tu disparo">🔫</span>
+            `;
         }
 
         const estadoLbl = document.getElementById('lblEstadoEleccionPersonal');
@@ -968,18 +978,18 @@
             resumenTexto = `
                 <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
                 <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
-                <div class="text-danger mt-2 fw-bold text-center">💀 ${defensor} pierde el duelo y tendrá 3 porciones en la ruleta.</div>
+                <div class="text-danger mt-2 fw-bold text-center">💀 ${defensor} pierde el duelo y su nombre llenará TODAS las porciones vacías.</div>
             `;
-            asegurarTotalPorciones(perdedorUnico, 3);
+            llenarTodasLasPorcionesVacias(perdedorUnico);
         } else if (j2Acierta) {
             perdedorUnico = agresor;
             tituloHtml = `🎯 ¡IMPACTO CERTERO! El Defensor ${defensor} repelió y acertó 🔫.`;
             resumenTexto = `
                 <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
                 <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
-                <div class="text-danger mt-2 fw-bold text-center">💀 ${agresor} pierde el duelo y tendrá 3 porciones en la ruleta.</div>
+                <div class="text-danger mt-2 fw-bold text-center">💀 ${agresor} pierde el duelo y su nombre llenará TODAS las porciones vacías.</div>
             `;
-            asegurarTotalPorciones(perdedorUnico, 3);
+            llenarTodasLasPorcionesVacias(perdedorUnico);
         } else {
             tituloHtml = `💨 ¡AMBOS FALLARON! Disparos a trincheras vacías 🔫.`;
             resumenTexto = `
@@ -1035,7 +1045,7 @@
             `;
         }
 
-        // 2. Disparos e Impactos
+        // 2. Disparos e Impactos en todos los dispositivos
         const celdaDispAgresor = document.getElementById(`celda_col2_${p.j1.disp}`);
         if (celdaDispAgresor) {
             const cont = celdaDispAgresor.querySelector('.fila-contenido');
@@ -1054,7 +1064,7 @@
             }
         }
 
-        // 3. Cuadro de texto dorado con fondo aclarado y textos de alto contraste
+        // 3. Cuadro de texto de alto contraste
         const cuadroRes = document.getElementById('cuadroResultadoDuelo');
         const tituloRes = document.getElementById('resumenDueloTitulo');
         const detalleRes = document.getElementById('resumenDueloDetalle');
@@ -1063,6 +1073,15 @@
         detalleRes.innerHTML = p.resumenTexto;
         cuadroRes.classList.remove('d-none');
         reproducirSonido('sndDisparo');
+    }
+
+    // Llena ABSOLUTAMENTE TODAS las porciones vacías con el nombre del perdedor
+    function llenarTodasLasPorcionesVacias(nombre) {
+        for (let i = 0; i < porciones.length; i++) {
+            if (porciones[i] === null) {
+                porciones[i] = nombre;
+            }
+        }
     }
 
     function asegurarTotalPorciones(nombre, totalDeseado) {
