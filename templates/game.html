@@ -740,7 +740,7 @@
 
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('modalElegirRival')).show();
             }
-        }, 3500);
+        }, 3000);
     }
 
     function enviarPropuestaReto(agresor, defensor) {
@@ -768,7 +768,7 @@
 
         if (esAdmin) {
             sincronizarTodo(msg);
-            setTimeout(iniciarGiroRuleta, 2500);
+            setTimeout(iniciarGiroRuleta, 2000);
         }
     }
 
@@ -815,7 +815,7 @@
 
         if (esAdmin) {
             sincronizarTodo(msg);
-            setTimeout(iniciarGiroRuleta, 2500);
+            setTimeout(iniciarGiroRuleta, 2000);
         }
     }
 
@@ -964,14 +964,20 @@
         let resumenTexto = "";
 
         if (j1Acierta && j2Acierta) {
+            // n: cantidad total de jugadores vivos incluyendo Cerebro
+            const nTotal = obtenerVivos().length;
+            const porcionesExtra = Math.floor(nTotal / 2);
+
             tituloHtml = `💥 ¡FUEGO CRUZADO! Ambos acertaron con sus pistolas 🔫.`;
             resumenTexto = `
                 <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
                 <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-success fw-bold">ACERTÓ 🎯</span>)</div>
-                <div class="text-warning mt-2 fw-bold text-center">⚔️ Ambos jugadores tendrán un total de 2 porciones en la ruleta.</div>
+                <div class="text-warning mt-2 fw-bold text-center">⚔️ Con n = ${nTotal}, cada jugador recibe +${porcionesExtra} porción(es) adicional(es) en la ruleta.</div>
             `;
-            asegurarTotalPorciones(agresor, 2);
-            asegurarTotalPorciones(defensor, 2);
+
+            // Se asignan las porciones adicionales calculadas a cada combatiente sin sobreponerse
+            agregarPorcionesAdicionales(agresor, porcionesExtra);
+            agregarPorcionesAdicionales(defensor, porcionesExtra);
         } else if (j1Acierta) {
             perdedorUnico = defensor;
             tituloHtml = `🎯 ¡IMPACTO CERTERO! El Agresor ${agresor} acertó su disparo 🔫.`;
@@ -995,8 +1001,11 @@
             resumenTexto = `
                 <div class="item-desglose-duelo">🔴 <strong class="text-white">${agresor} (Agresor):</strong> Se cubrió en Fila ${j1.pos} | Disparó a Fila ${j1.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
                 <div class="item-desglose-duelo">🔵 <strong class="text-white">${defensor} (Defensor):</strong> Se cubrió en Fila ${j2.pos} | Disparó a Fila ${j2.disp} (<span class="text-secondary fw-bold">FALLÓ 💨</span>)</div>
-                <div class="text-info mt-2 fw-bold text-center">Nadie recibe porciones adicionales.</div>
+                <div class="text-warning mt-2 fw-bold text-center">💨 Ambos fallaron: se añade +1 porción adicional a cada combatiente en la ruleta.</div>
             `;
+            // Se aumenta 1 porción adicional en casillas vacías a cada jugador
+            agregarPorcionesAdicionales(agresor, 1);
+            agregarPorcionesAdicionales(defensor, 1);
         }
 
         const payloadResultado = {
@@ -1020,7 +1029,7 @@
             if (esAdmin) {
                 setTimeout(iniciarGiroRuleta, 2000);
             }
-        }, 5000);
+        }, 4000);
     }
 
     function recibirResultadoArena(p) {
@@ -1084,6 +1093,17 @@
         }
     }
 
+    // Agrega exactamente 'cantidad' porciones adicionales en casillas vacías (null)
+    function agregarPorcionesAdicionales(nombre, cantidad) {
+        let insertadas = 0;
+        for (let i = 0; i < porciones.length && insertadas < cantidad; i++) {
+            if (porciones[i] === null) {
+                porciones[i] = nombre;
+                insertadas++;
+            }
+        }
+    }
+
     function asegurarTotalPorciones(nombre, totalDeseado) {
         let actuales = porciones.filter(p => p === nombre).length;
         for (let i = 0; i < porciones.length && actuales < totalDeseado; i++) {
@@ -1132,7 +1152,7 @@
 
         forzarCierreModalDuelo();
 
-        const duracion = 4200;
+        const duracion = 4000;
         const inicio = performance.now();
         const anguloInicial = anguloActual;
         const deltaAngulo = data.anguloFinalRadianes - (anguloInicial % (Math.PI * 2));
@@ -1213,9 +1233,9 @@
                     afectadoConBalaImpacto = null;
                     sincronizarTodo("✅ Posiciones reasignadas. Preparando siguiente ronda...");
 
-                    setTimeout(iniciarFaseBala, 2500);
-                }, 2500);
-            }, 3500);
+                    setTimeout(iniciarFaseBala, 2000);
+                }, 2000);
+            }, 3000);
         } else {
             document.getElementById('txtEstado').innerText = mensaje;
         }
